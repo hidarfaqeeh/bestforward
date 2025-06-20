@@ -1,0 +1,94 @@
+{
+  "apiVersion": "v1",
+  "spec": {
+    "kind": "Workflow",
+    "spec": {
+      "type": "deployment",
+      "context": {
+        "stack": "python",
+        "buildpack": "python-3.11"
+      },
+      "steps": [
+        {
+          "name": "telegram-bot-deployment",
+          "uses": "nf/deployment@v1",
+          "with": {
+            "name": "telegram-forwarding-bot",
+            "billing": {
+              "deploymentPlan": "nf-compute-10"
+            },
+            "deployment": {
+              "instances": 1,
+              "docker": {
+                "configType": "dockerfile"
+              },
+              "internal": false,
+              "storage": {
+                "ephemeralStorage": {
+                  "storageSize": 1024
+                }
+              },
+              "resources": {
+                "limits": {
+                  "memory": "512Mi",
+                  "cpu": "0.2"
+                },
+                "requests": {
+                  "memory": "256Mi", 
+                  "cpu": "0.1"
+                }
+              }
+            },
+            "ports": [
+              {
+                "name": "p01",
+                "internalPort": 5000,
+                "public": true,
+                "protocol": "HTTP",
+                "security": {
+                  "policies": [],
+                  "headers": {}
+                },
+                "domains": []
+              }
+            ],
+            "runtimeEnvironment": {
+              "BOT_TOKEN": {
+                "value": "${SECRET_BOT_TOKEN}"
+              },
+              "DATABASE_URL": {
+                "value": "${SECRET_DATABASE_URL}"
+              },
+              "ADMIN_USER_IDS": {
+                "value": "${SECRET_ADMIN_USER_IDS}"
+              },
+              "WEBHOOK_HOST": {
+                "value": "${SECRET_WEBHOOK_HOST}"
+              },
+              "WEBHOOK_PORT": {
+                "value": "5000"
+              },
+              "PYTHONUNBUFFERED": {
+                "value": "1"
+              }
+            },
+            "buildConfiguration": {
+              "pathIgnoreRules": [
+                ".git/",
+                "logs/",
+                "__pycache__/",
+                "*.pyc",
+                ".pytest_cache/",
+                "*.log"
+              ]
+            },
+            "git": {
+              "projectUrl": "${GIT_CLONE_URL}",
+              "projectType": "github"
+            }
+          }
+        }
+      ]
+    }
+  }
+}
