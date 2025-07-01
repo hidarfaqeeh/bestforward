@@ -1,0 +1,15 @@
+aiogram>=3.20.0
+aiohttp>=3.11.0
+aiosqlite>=0.17.0
+alembic>=1.13.1
+asyncpg>=0.30.0
+cryptography>=45.0.4
+googletrans>=4.0.2
+loguru>=0.7.3
+psutil>=7.0.0
+pyrogram>=2.0.106
+python-dateutil>=2.8.2
+pytz>=2025.2
+sqlalchemy>=2.0.41
+telethon>=1.40.0
+tgcrypto>=1.2.5

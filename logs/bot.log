@@ -13122,3 +13122,48 @@ Length limit
 2025-06-20 09:17:54 | DEBUG    | modules.channel_monitor:_check_new_messages:180 - Channel monitor heartbeat - task 4, chat -1002259745111
 2025-06-20 09:17:59 | DEBUG    | modules.channel_monitor:_check_new_messages:180 - Channel monitor heartbeat - task 1, chat -1002289754739
 2025-06-20 09:18:59 | DEBUG    | modules.channel_monitor:_check_new_messages:180 - Channel monitor heartbeat - task 4, chat -1002259745111
+2025-07-01 06:22:17 | INFO     | config:load_config:64 - Configuration loaded successfully
+2025-07-01 06:22:17 | DEBUG    | config:load_config:65 - Webhook mode: False
+2025-07-01 06:22:17 | DEBUG    | config:load_config:66 - Admin users: 0
+2025-07-01 06:22:17 | DEBUG    | config:load_config:67 - Userbot enabled: False
+2025-07-01 06:22:17 | INFO     | __main__:initialize:50 - Initializing Telegram Forwarding Bot...
+2025-07-01 06:22:17 | ERROR    | database:initialize:111 - Failed to initialize database: Could not parse SQLAlchemy URL from given URL string
+2025-07-01 06:22:17 | ERROR    | __main__:initialize:126 - Failed to initialize bot: Could not parse SQLAlchemy URL from given URL string
+2025-07-01 06:22:17 | ERROR    | __main__:start:333 - Failed to start bot: Could not parse SQLAlchemy URL from given URL string
+2025-07-01 06:22:17 | INFO     | __main__:shutdown:339 - Shutting down bot...
+2025-07-01 06:22:17 | SUCCESS  | __main__:shutdown:361 - Database connections closed
+2025-07-01 06:22:17 | SUCCESS  | __main__:shutdown:363 - Bot shutdown completed
+2025-07-01 06:22:17 | ERROR    | __main__:main:409 - Unexpected error: Could not parse SQLAlchemy URL from given URL string
+2025-07-01 06:22:17 | INFO     | __main__:shutdown:339 - Shutting down bot...
+2025-07-01 06:22:17 | SUCCESS  | __main__:shutdown:361 - Database connections closed
+2025-07-01 06:22:17 | SUCCESS  | __main__:shutdown:363 - Bot shutdown completed
+2025-07-01 06:27:29 | INFO     | config:load_config:64 - Configuration loaded successfully
+2025-07-01 06:27:29 | DEBUG    | config:load_config:65 - Webhook mode: False
+2025-07-01 06:27:29 | DEBUG    | config:load_config:66 - Admin users: 1
+2025-07-01 06:27:29 | DEBUG    | config:load_config:67 - Userbot enabled: False
+2025-07-01 06:27:29 | INFO     | __main__:initialize:50 - Initializing Telegram Forwarding Bot...
+2025-07-01 06:27:29 | ERROR    | database:initialize:124 - Failed to initialize database: Could not parse SQLAlchemy URL from given URL string
+2025-07-01 06:27:29 | ERROR    | __main__:initialize:126 - Failed to initialize bot: Could not parse SQLAlchemy URL from given URL string
+2025-07-01 06:27:29 | ERROR    | __main__:start:333 - Failed to start bot: Could not parse SQLAlchemy URL from given URL string
+2025-07-01 06:27:29 | INFO     | __main__:shutdown:339 - Shutting down bot...
+2025-07-01 06:27:29 | SUCCESS  | __main__:shutdown:361 - Database connections closed
+2025-07-01 06:27:29 | SUCCESS  | __main__:shutdown:363 - Bot shutdown completed
+2025-07-01 06:27:29 | ERROR    | __main__:main:409 - Unexpected error: Could not parse SQLAlchemy URL from given URL string
+2025-07-01 06:27:29 | INFO     | __main__:shutdown:339 - Shutting down bot...
+2025-07-01 06:27:29 | SUCCESS  | __main__:shutdown:361 - Database connections closed
+2025-07-01 06:27:29 | SUCCESS  | __main__:shutdown:363 - Bot shutdown completed
+2025-07-01 06:28:27 | INFO     | config:load_config:64 - Configuration loaded successfully
+2025-07-01 06:28:27 | DEBUG    | config:load_config:65 - Webhook mode: False
+2025-07-01 06:28:27 | DEBUG    | config:load_config:66 - Admin users: 1
+2025-07-01 06:28:27 | DEBUG    | config:load_config:67 - Userbot enabled: False
+2025-07-01 06:28:27 | INFO     | __main__:initialize:50 - Initializing Telegram Forwarding Bot...
+2025-07-01 06:28:27 | ERROR    | database:initialize:132 - Failed to initialize database: Could not parse SQLAlchemy URL from given URL string
+2025-07-01 06:28:27 | ERROR    | __main__:initialize:126 - Failed to initialize bot: Could not parse SQLAlchemy URL from given URL string
+2025-07-01 06:28:27 | ERROR    | __main__:start:333 - Failed to start bot: Could not parse SQLAlchemy URL from given URL string
+2025-07-01 06:28:27 | INFO     | __main__:shutdown:339 - Shutting down bot...
+2025-07-01 06:28:27 | SUCCESS  | __main__:shutdown:361 - Database connections closed
+2025-07-01 06:28:27 | SUCCESS  | __main__:shutdown:363 - Bot shutdown completed
+2025-07-01 06:28:27 | ERROR    | __main__:main:409 - Unexpected error: Could not parse SQLAlchemy URL from given URL string
+2025-07-01 06:28:27 | INFO     | __main__:shutdown:339 - Shutting down bot...
+2025-07-01 06:28:27 | SUCCESS  | __main__:shutdown:361 - Database connections closed
+2025-07-01 06:28:27 | SUCCESS  | __main__:shutdown:363 - Bot shutdown completed

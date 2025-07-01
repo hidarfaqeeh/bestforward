@@ -12,16 +12,24 @@ services:
       - WEBHOOK_HOST=${WEBHOOK_HOST}
       - WEBHOOK_PORT=5000
       - PYTHONUNBUFFERED=1
+      - API_ID=${API_ID}
+      - API_HASH=${API_HASH}
+      - STRING_SESSION=${STRING_SESSION}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY:-your-32-char-encryption-key-here}
     ports:
       - "5000:5000"
     volumes:
       - ./logs:/app/logs
+      - ./data:/app/data
+      - ./sessions:/app/sessions
       - ./secure_session.enc:/app/secure_session.enc
       - ./new_session.txt:/app/new_session.txt
     depends_on:
       - postgres
+    networks:
+      - bot-network
     healthcheck:
-      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:5000/health', timeout=10)"]
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -39,11 +47,50 @@ services:
       - postgres_data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
+    networks:
+      - bot-network
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d telegram_bot"]
       interval: 10s
       timeout: 5s
       retries: 5
 
+  # خدمة اختيارية لقاعدة بيانات SQLite (للتطوير المحلي)
+  telegram-bot-sqlite:
+    build: .
+    container_name: telegram-forwarding-bot-sqlite
+    restart: unless-stopped
+    environment:
+      - BOT_TOKEN=${BOT_TOKEN}
+      - DATABASE_URL=sqlite:///data/telegram_bot.db
+      - ADMIN_USER_IDS=${ADMIN_USER_IDS}
+      - WEBHOOK_HOST=${WEBHOOK_HOST}
+      - WEBHOOK_PORT=5000
+      - PYTHONUNBUFFERED=1
+      - API_ID=${API_ID}
+      - API_HASH=${API_HASH}
+      - STRING_SESSION=${STRING_SESSION}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY:-your-32-char-encryption-key-here}
+    ports:
+      - "5001:5000"
+    volumes:
+      - ./logs:/app/logs
+      - ./data:/app/data
+      - ./sessions:/app/sessions
+    networks:
+      - bot-network
+    profiles:
+      - sqlite
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
 volumes:
   postgres_data:
+
+networks:
+  bot-network:
+    driver: bridge
