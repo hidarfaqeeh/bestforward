@@ -22,6 +22,9 @@ class Database:
     """Database management class"""
 
     def __init__(self, database_url: str):
+        # Store original URL
+        self.original_url = database_url
+        
         # Clean URL by removing SSL parameters that cause issues with asyncpg
         import urllib.parse
         parsed = urllib.parse.urlparse(database_url)
@@ -37,7 +40,18 @@ class Database:
         ))
 
         self.database_url = clean_url
-        self.async_database_url = clean_url.replace("postgresql://", "postgresql+asyncpg://")
+        
+        # Handle different database types
+        if clean_url.startswith("sqlite"):
+            self.async_database_url = clean_url.replace("sqlite://", "sqlite+aiosqlite://")
+            self.is_postgresql = False
+        elif clean_url.startswith("postgresql"):
+            self.async_database_url = clean_url.replace("postgresql://", "postgresql+asyncpg://")
+            self.is_postgresql = True
+        else:
+            self.async_database_url = clean_url
+            self.is_postgresql = "postgresql" in clean_url
+            
         self.engine = None
         self.async_session_factory = None
         self.pool = None
@@ -45,15 +59,23 @@ class Database:
     async def initialize(self):
         """Initialize database connections and create tables"""
         try:
-            # Create async engine
-            self.engine = create_async_engine(
-                self.async_database_url,
-                echo=False,
-                pool_size=20,
-                max_overflow=30,
-                pool_pre_ping=True,
-                pool_recycle=3600,
-            )
+            # Create async engine with different settings for SQLite vs PostgreSQL
+            if self.is_postgresql:
+                self.engine = create_async_engine(
+                    self.async_database_url,
+                    echo=False,
+                    pool_size=20,
+                    max_overflow=30,
+                    pool_pre_ping=True,
+                    pool_recycle=3600,
+                )
+            else:
+                # SQLite configuration
+                self.engine = create_async_engine(
+                    self.async_database_url,
+                    echo=False,
+                    pool_pre_ping=True,
+                )
 
             # Create session factory
             self.async_session_factory = async_sessionmaker(
@@ -62,26 +84,25 @@ class Database:
                 expire_on_commit=False
             )
 
-            # Create connection pool for direct queries using individual parameters
-            import urllib.parse
-            original_url = database_url if hasattr(self, 'original_url') else self.database_url
-            if not hasattr(self, 'original_url'):
-                import os
-                original_url = os.getenv('DATABASE_URL', self.database_url)
+            # Create connection pool only for PostgreSQL
+            if self.is_postgresql:
+                import urllib.parse
+                parsed_url = urllib.parse.urlparse(self.original_url)
 
-            parsed_url = urllib.parse.urlparse(original_url)
-
-            # Create connection pool with explicit parameters to avoid SSL issues
-            self.pool = await asyncpg.create_pool(
-                host=parsed_url.hostname,
-                port=parsed_url.port or 5432,
-                user=parsed_url.username,
-                password=parsed_url.password,
-                database=parsed_url.path.lstrip('/'),
-                min_size=5,
-                max_size=20,
-                command_timeout=60
-            )
+                # Create connection pool with explicit parameters to avoid SSL issues
+                self.pool = await asyncpg.create_pool(
+                    host=parsed_url.hostname,
+                    port=parsed_url.port or 5432,
+                    user=parsed_url.username,
+                    password=parsed_url.password,
+                    database=parsed_url.path.lstrip('/'),
+                    min_size=5,
+                    max_size=20,
+                    command_timeout=60
+                )
+            else:
+                # For SQLite, we'll use the SQLAlchemy session directly
+                self.pool = None
 
             # Import models to ensure they're registered
             from models import (
@@ -466,23 +487,46 @@ class Database:
 
     async def execute_query(self, query: str, *args) -> List[Dict[str, Any]]:
         """Execute raw SQL query"""
-        async with self.pool.acquire() as conn:
-            try:
-                rows = await conn.fetch(query, *args)
-                return [dict(row) for row in rows]
-            except Exception as e:
-                logger.error(f"Query execution failed: {e}")
-                raise
+        if self.is_postgresql and self.pool:
+            async with self.pool.acquire() as conn:
+                try:
+                    rows = await conn.fetch(query, *args)
+                    return [dict(row) for row in rows]
+                except Exception as e:
+                    logger.error(f"Query execution failed: {e}")
+                    raise
+        else:
+            # Use SQLAlchemy for SQLite or when no pool available
+            async with self.get_session() as session:
+                try:
+                    from sqlalchemy import text
+                    result = await session.execute(text(query), dict(enumerate(args, 1)))
+                    rows = result.fetchall()
+                    return [dict(row._mapping) for row in rows]
+                except Exception as e:
+                    logger.error(f"Query execution failed: {e}")
+                    raise
 
     async def execute_command(self, command: str, *args) -> str:
         """Execute SQL command (INSERT, UPDATE, DELETE)"""
-        async with self.pool.acquire() as conn:
-            try:
-                result = await conn.execute(command, *args)
-                return result
-            except Exception as e:
-                logger.error(f"Command execution failed: {e}")
-                raise
+        if self.is_postgresql and self.pool:
+            async with self.pool.acquire() as conn:
+                try:
+                    result = await conn.execute(command, *args)
+                    return result
+                except Exception as e:
+                    logger.error(f"Command execution failed: {e}")
+                    raise
+        else:
+            # Use SQLAlchemy for SQLite or when no pool available
+            async with self.get_session() as session:
+                try:
+                    from sqlalchemy import text
+                    result = await session.execute(text(command), dict(enumerate(args, 1)))
+                    return str(result.rowcount)
+                except Exception as e:
+                    logger.error(f"Command execution failed: {e}")
+                    raise
 
     async def get_user_by_id(self, user_id: int) -> Optional[Dict[str, Any]]:
         """Get user by Telegram ID"""
