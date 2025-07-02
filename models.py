@@ -161,6 +161,7 @@ class TaskSettings(Base):
     filter_inline_buttons = Column(Boolean, default=False, nullable=False)  # Block transparent buttons
     filter_duplicates = Column(Boolean, default=False, nullable=False)  # Block duplicate messages
     filter_language = Column(Boolean, default=False, nullable=False)  # Language filtering
+    filter_bots = Column(Boolean, default=False, nullable=False)  # Filter bot messages
     language_filter_mode = Column(String(50), default="blacklist", nullable=False)  # 'whitelist' or 'blacklist'
     allowed_languages = Column(JSON, nullable=True)  # List of allowed/blocked languages
     keyword_filters = Column(JSON, nullable=True)  # List of keywords to filter
