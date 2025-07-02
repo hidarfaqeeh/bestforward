@@ -38,25 +38,37 @@ class TaskManager:
                 task_type = task_data.get("task_type", "bot")
                 description = task_data.get("description", "")
                 
-                # Get user database ID
+                # Ensure user exists in database first
                 user = await self.database.get_user_by_id(user_id)
                 if not user:
-                    logger.error(f"User {user_id} not found")
-                    return None
+                    # Create user if doesn't exist
+                    user_data = {
+                        "telegram_id": user_id,
+                        "username": None,  # Will be set when available
+                        "first_name": None,
+                        "last_name": None,
+                        "is_admin": False,
+                        "is_active": True
+                    }
+                    user = await self.database.create_or_update_user(user_data)
+                    if not user:
+                        logger.error(f"Failed to create user {user_id}")
+                        return None
+                    logger.info(f"Created user {user_id} for task creation")
                 
-                # Create task
+                # Create task using the user's database ID
                 task_query = """
                     INSERT INTO tasks (user_id, name, description, task_type, is_active, created_at, updated_at)
-                    VALUES ((SELECT id FROM users WHERE telegram_id = $1), $2, $3, $4, false, NOW(), NOW())
+                    VALUES ($1, $2, $3, $4, false, NOW(), NOW())
                     RETURNING id
                 """
                 
                 result = await self.database.execute_query(
-                    task_query, user_id, task_name, description, task_type
+                    task_query, user["id"], task_name, description, task_type
                 )
                 
                 if not result:
-                    logger.error("Failed to create task")
+                    logger.error("Failed to create task - no result returned")
                     return None
                 
                 task_id = result[0]["id"]
