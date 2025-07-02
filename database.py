@@ -1,4 +1,4 @@
-THIS SHOULD BE A LINTER ERROR"""
+"""
 Database management for Telegram Forwarding Bot
 """
 
@@ -399,6 +399,15 @@ class Database:
         try:
             await self.execute_command("""
                 ALTER TABLE task_settings 
+                ADD COLUMN IF NOT EXISTS filter_bots BOOLEAN DEFAULT FALSE
+            """)
+            logger.info("Added filter_bots column")
+        except Exception as e:
+            logger.warning(f"Could not add filter_bots column: {e}")
+
+        try:
+            await self.execute_command("""
+                ALTER TABLE task_settings 
                 ADD COLUMN IF NOT EXISTS language_filter_mode VARCHAR(50) DEFAULT 'blacklist'
             """)
             logger.info("Added language_filter_mode column")
@@ -413,6 +422,16 @@ class Database:
             logger.info("Added allowed_languages column")
         except Exception as e:
             logger.warning(f"Could not add allowed_languages column: {e}")
+
+        # Add filter_bots column
+        try:
+            await self.execute_command("""
+                ALTER TABLE task_settings 
+                ADD COLUMN IF NOT EXISTS filter_bots BOOLEAN DEFAULT FALSE
+            """)
+            logger.info("Added filter_bots column")
+        except Exception as e:
+            logger.warning(f"Could not add filter_bots column: {e}")
 
         # Add advanced forwarding options
         try:

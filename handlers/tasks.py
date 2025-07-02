@@ -517,6 +517,9 @@ class TaskHandlers:
             elif data.startswith("toggle_filter_language_"):
                 task_id = int(data.split("_")[-1])
                 await self._toggle_language_filter(callback, task_id, state)
+            elif data.startswith("toggle_filter_bots_"):
+                task_id = int(data.split("_")[-1])
+                await self._toggle_bot_filter(callback, task_id, state)
             elif data.startswith("clear_duplicates_"):
                 task_id = int(data.split("_")[-1])
                 await self._clear_duplicates(callback, task_id, state)
