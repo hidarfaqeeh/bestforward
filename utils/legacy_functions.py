@@ -1,28 +1,16 @@
 """
-High-performance utils package for Telegram Forwarding Bot
-
-This package provides optimized utilities for performance-critical operations:
-- CallbackRouter: O(1) callback routing vs O(365) elif chains
-- DatabaseCache: Intelligent caching with TTL and LRU eviction
-- MemoryManager: Automatic memory optimization and leak prevention
+Legacy utility functions - compatibility layer for existing code
 """
 
+import re
 import json
+import logging
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Union
 
-# Performance utilities
-try:
-    from .callback_router import CallbackRouter
-    from .database_cache import DatabaseCache
-    from .memory_manager import MemoryManager
-except ImportError:
-    # Graceful fallback if performance utilities aren't available
-    CallbackRouter = None
-    DatabaseCache = None
-    MemoryManager = None
+logger = logging.getLogger(__name__)
 
-# Essential functions for compatibility
+
 def validate_forward_settings(settings: Dict[str, Any]) -> Dict[str, Any]:
     """Validate and sanitize forwarding settings"""
     validated = {}
@@ -67,7 +55,8 @@ def validate_forward_settings(settings: Dict[str, Any]) -> Dict[str, Any]:
 
         return validated
 
-    except Exception:
+    except Exception as e:
+        logger.error(f"Error validating forward settings: {e}")
         return {
             "forward_mode": "copy",
             "preserve_sender": False,
@@ -97,7 +86,8 @@ def safe_json_loads(json_str: str, default: Any = None) -> Any:
         if not json_str:
             return default
         return json.loads(json_str)
-    except (json.JSONDecodeError, TypeError):
+    except (json.JSONDecodeError, TypeError) as e:
+        logger.error(f"Error parsing JSON: {e}")
         return default
 
 
@@ -105,7 +95,8 @@ def safe_json_dumps(obj: Any) -> str:
     """Safely dump object to JSON string"""
     try:
         return json.dumps(obj, ensure_ascii=False)
-    except (TypeError, ValueError):
+    except (TypeError, ValueError) as e:
+        logger.error(f"Error dumping JSON: {e}")
         return "{}"
 
 
@@ -138,7 +129,8 @@ def format_datetime(dt: datetime, format_type: str = "full") -> str:
         else:
             return dt.strftime("%Y-%m-%d %H:%M:%S")
 
-    except Exception:
+    except Exception as e:
+        logger.error(f"Error formatting datetime: {e}")
         return "Invalid date"
 
 
@@ -164,7 +156,8 @@ def extract_chat_id(text: str) -> Optional[int]:
 
         return None
 
-    except Exception:
+    except Exception as e:
+        logger.error(f"Error extracting chat ID from '{text}': {e}")
         return None
 
 
@@ -210,7 +203,8 @@ def parse_chat_identifier(identifier: str) -> Dict[str, Any]:
         result["value"] = identifier
         return result
 
-    except Exception:
+    except Exception as e:
+        logger.error(f"Error parsing chat identifier '{identifier}': {e}")
         return {"type": "error", "value": None, "original": identifier}
 
 
@@ -265,7 +259,8 @@ def validate_telegram_data(data: Dict[str, Any]) -> Dict[str, Any]:
 
         return validated
 
-    except Exception:
+    except Exception as e:
+        logger.error(f"Error validating Telegram data: {e}")
         return {}
 
 
@@ -284,7 +279,8 @@ def format_number(num: Union[int, float], precision: int = 1) -> str:
         else:
             return f"{num/1000000000:.{precision}f}B"
 
-    except Exception:
+    except Exception as e:
+        logger.error(f"Error formatting number: {e}")
         return str(num)
 
 
@@ -300,35 +296,3 @@ def format_duration(seconds: int) -> str:
         hours = seconds // 3600
         remaining_minutes = (seconds % 3600) // 60
         return f"{hours}h {remaining_minutes}m"
-
-
-# Try to import from legacy functions as fallback
-try:
-    from .legacy_functions import *
-except ImportError:
-    pass  # Use the functions defined above
-
-
-__all__ = [
-    # Performance utilities
-    'CallbackRouter',
-    'DatabaseCache', 
-    'MemoryManager',
-    
-    # Essential functions
-    'validate_forward_settings',
-    'generate_task_name',
-    'safe_json_loads',
-    'safe_json_dumps',
-    'format_datetime',
-    'extract_chat_id',
-    'parse_chat_identifier',
-    'truncate_text',
-    'escape_markdown',
-    'validate_telegram_data',
-    'format_number',
-    'format_duration'
-]
-
-__version__ = "1.0.0"
-__description__ = "Performance and reliability utilities for dashboard"
