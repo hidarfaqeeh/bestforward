@@ -5,7 +5,11 @@ Configuration management for Telegram Forwarding Bot
 import os
 from typing import Optional
 
+from dotenv import load_dotenv
 from loguru import logger
+
+# Load environment variables from .env file
+load_dotenv()
 
 
 class Config:
