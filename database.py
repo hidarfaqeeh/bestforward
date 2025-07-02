@@ -1,4 +1,4 @@
-"""
+THIS SHOULD BE A LINTER ERROR"""
 Database management for Telegram Forwarding Bot
 """
 
