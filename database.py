@@ -396,14 +396,7 @@ class Database:
         except Exception as e:
             logger.warning(f"Could not add filter_language column: {e}")
 
-        try:
-            await self.execute_command("""
-                ALTER TABLE task_settings 
-                ADD COLUMN IF NOT EXISTS filter_bots BOOLEAN DEFAULT FALSE
-            """)
-            logger.info("Added filter_bots column")
-        except Exception as e:
-            logger.warning(f"Could not add filter_bots column: {e}")
+        # filter_bots column removed - not implemented
 
         try:
             await self.execute_command("""
@@ -423,15 +416,7 @@ class Database:
         except Exception as e:
             logger.warning(f"Could not add allowed_languages column: {e}")
 
-        # Add filter_bots column
-        try:
-            await self.execute_command("""
-                ALTER TABLE task_settings 
-                ADD COLUMN IF NOT EXISTS filter_bots BOOLEAN DEFAULT FALSE
-            """)
-            logger.info("Added filter_bots column")
-        except Exception as e:
-            logger.warning(f"Could not add filter_bots column: {e}")
+        # filter_bots column removed - not needed
 
         # Add advanced forwarding options
         try:
@@ -883,7 +868,7 @@ class Database:
         """Get task settings including all media type columns"""
         query = """
             SELECT task_id, forward_mode, preserve_sender, add_caption, custom_caption,
-                   filter_media, filter_text, filter_forwarded, filter_links, filter_bots, keyword_filters,
+                   filter_media, filter_text, filter_forwarded, filter_links, keyword_filters,
                    keyword_filter_mode,
                    allow_text, allow_photos, allow_videos, allow_documents, allow_audio, allow_voice,
                    allow_video_notes, allow_stickers, allow_animations, allow_contacts,
