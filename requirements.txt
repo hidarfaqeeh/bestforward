@@ -13,3 +13,4 @@ pytz>=2025.2
 sqlalchemy>=2.0.41
 telethon>=1.40.0
 tgcrypto>=1.2.5
+python-dotenv==1.0.0
