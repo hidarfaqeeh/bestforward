@@ -1521,7 +1521,7 @@ Monitoring for forwarding results...
             await callback.message.edit_text(tools_text, reply_markup=keyboard, parse_mode="Markdown")
             await callback.answer()
 
-                 except Exception as e:
+        except Exception as e:
             logger.error(f"Error in advanced tools: {e}")
             await callback.answer("❌ خطأ في عرض الأدوات المتقدمة", show_alert=True)
 
