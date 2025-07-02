@@ -44,6 +44,7 @@ class SecurityManager:
         """Initialize security manager"""
         try:
             await self._load_user_permissions()
+            await self._sync_admin_users_from_config()
             logger.success("Security manager initialized successfully")
         except Exception as e:
             logger.error(f"Failed to initialize security manager: {e}")
@@ -60,6 +61,73 @@ class SecurityManager:
         key_hash = hashlib.sha256(key.encode()).digest()
         import base64
         return base64.urlsafe_b64encode(key_hash)
+    
+    async def _sync_admin_users_from_config(self):
+        """Sync admin users from environment variables"""
+        try:
+            # Get admin user IDs from config
+            import os
+            admin_ids_str = os.getenv("ADMIN_USER_IDS", "")
+            
+            if not admin_ids_str:
+                logger.warning("No ADMIN_USER_IDS configured in environment")
+                return
+            
+            # Parse admin IDs
+            try:
+                admin_ids = [int(uid.strip()) for uid in admin_ids_str.split(",") if uid.strip()]
+            except ValueError as e:
+                logger.error(f"Invalid ADMIN_USER_IDS format: {e}")
+                return
+            
+            # Add each admin user to the system
+            for user_id in admin_ids:
+                try:
+                    # Check if user exists in database
+                    existing_user = await self.database.get_user_by_id(user_id)
+                    
+                    if existing_user:
+                        # Update existing user to admin
+                        if not existing_user.get('is_admin', False):
+                            await self.database.execute_command(
+                                "UPDATE users SET is_admin = true WHERE telegram_id = $1",
+                                user_id
+                            )
+                            logger.info(f"Updated existing user {user_id} to admin")
+                        
+                        # Update cache
+                        self.authorized_users.add(user_id)
+                        self.admin_users.add(user_id)
+                    else:
+                        # Create new admin user
+                        user_data = {
+                            "telegram_id": user_id,
+                            "username": None,
+                            "first_name": f"Admin_{user_id}",
+                            "last_name": None,
+                            "is_admin": True,
+                            "is_active": True,
+                            "language": "ar"
+                        }
+                        
+                        await self.database.create_or_update_user(user_data)
+                        
+                        # Update cache
+                        self.authorized_users.add(user_id)
+                        self.admin_users.add(user_id)
+                        
+                        logger.info(f"Created new admin user: {user_id}")
+                        
+                except Exception as user_error:
+                    logger.error(f"Failed to sync admin user {user_id}: {user_error}")
+                    # Add to cache anyway for immediate access
+                    self.authorized_users.add(user_id)
+                    self.admin_users.add(user_id)
+            
+            logger.success(f"Synced {len(admin_ids)} admin users from environment config")
+            
+        except Exception as e:
+            logger.error(f"Failed to sync admin users from config: {e}")
     
     async def _load_user_permissions(self):
         """Load user permissions from database"""
@@ -88,14 +156,28 @@ class SecurityManager:
             if user_id in self.banned_users:
                 await self._log_security_event(user_id, "access_denied", "User is banned")
                 return False
-            
+
             # Check rate limiting
             if not await self._check_rate_limit(user_id):
                 await self._log_security_event(user_id, "rate_limit_exceeded", 
                                              "User exceeded rate limit")
                 return False
-            
-            # Check if user is authorized
+
+            # Check if user is in ADMIN_USER_IDS environment variable (immediate access)
+            import os
+            admin_ids_str = os.getenv("ADMIN_USER_IDS", "")
+            if admin_ids_str:
+                try:
+                    admin_ids = [int(uid.strip()) for uid in admin_ids_str.split(",") if uid.strip()]
+                    if user_id in admin_ids:
+                        # Add to cache if not already there
+                        self.authorized_users.add(user_id)
+                        self.admin_users.add(user_id)
+                        return True
+                except ValueError:
+                    pass  # Invalid format, continue with normal checks
+
+            # Check if user is authorized in cache
             if user_id not in self.authorized_users:
                 # Check database for new users
                 user = await self.database.get_user_by_id(user_id)
@@ -108,9 +190,9 @@ class SecurityManager:
                 await self._log_security_event(user_id, "unauthorized_access", 
                                              "User not authorized")
                 return False
-            
+
             return True
-            
+
         except Exception as e:
             logger.error(f"Error verifying user access for {user_id}: {e}")
             return False
