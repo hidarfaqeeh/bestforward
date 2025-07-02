@@ -127,6 +127,9 @@ class Database:
                 ADD COLUMN IF NOT EXISTS language VARCHAR(10) DEFAULT 'ar'
             """)
 
+            # Create user_sessions table explicitly to avoid foreign key issues
+            await self.create_user_sessions_table()
+
             # Create additional tables for advanced features
             await self.create_advanced_tables()
 
@@ -157,6 +160,25 @@ class Database:
             logger.info("Ensured users table structure")
         except Exception as e:
             logger.warning(f"Could not ensure users table structure: {e}")
+
+    async def create_user_sessions_table(self):
+        """Create user_sessions table with proper foreign key"""
+        try:
+            await self.execute_command("""
+                CREATE TABLE IF NOT EXISTS user_sessions (
+                    id SERIAL PRIMARY KEY,
+                    user_id INTEGER NOT NULL,
+                    session_data JSON,
+                    current_state VARCHAR(255),
+                    expires_at TIMESTAMP,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+                )
+            """)
+            logger.info("Created user_sessions table")
+        except Exception as e:
+            logger.warning(f"Could not create user_sessions table: {e}")
 
     async def migrate_columns(self):
         """Add new columns if they don't exist"""
@@ -435,6 +457,21 @@ class Database:
     async def create_advanced_tables(self):
         """Create additional tables for advanced forwarding features"""
         try:
+            # Ensure tasks table exists first
+            await self.execute_command("""
+                CREATE TABLE IF NOT EXISTS tasks (
+                    id SERIAL PRIMARY KEY,
+                    user_id INTEGER NOT NULL,
+                    name VARCHAR(255) NOT NULL,
+                    description TEXT,
+                    task_type VARCHAR(50) DEFAULT 'bot' NOT NULL,
+                    is_active BOOLEAN DEFAULT TRUE NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+                )
+            """)
+            
             # Create manual_approvals table for manual forwarding mode
             await self.execute_command("""
                 CREATE TABLE IF NOT EXISTS manual_approvals (
