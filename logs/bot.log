@@ -13167,3 +13167,67 @@ Length limit
 2025-07-01 06:28:27 | INFO     | __main__:shutdown:339 - Shutting down bot...
 2025-07-01 06:28:27 | SUCCESS  | __main__:shutdown:361 - Database connections closed
 2025-07-01 06:28:27 | SUCCESS  | __main__:shutdown:363 - Bot shutdown completed
+2025-07-02 01:02:35 | INFO     | config:load_config:64 - Configuration loaded successfully
+2025-07-02 01:02:35 | DEBUG    | config:load_config:65 - Webhook mode: False
+2025-07-02 01:02:35 | DEBUG    | config:load_config:66 - Admin users: 0
+2025-07-02 01:02:35 | DEBUG    | config:load_config:67 - Userbot enabled: False
+2025-07-02 01:02:35 | INFO     | __main__:initialize:50 - Initializing Telegram Forwarding Bot...
+2025-07-02 01:02:35 | ERROR    | database:initialize:139 - Failed to initialize database: Could not parse SQLAlchemy URL from given URL string
+2025-07-02 01:02:35 | ERROR    | __main__:initialize:126 - Failed to initialize bot: Could not parse SQLAlchemy URL from given URL string
+2025-07-02 01:02:35 | ERROR    | __main__:start:333 - Failed to start bot: Could not parse SQLAlchemy URL from given URL string
+2025-07-02 01:02:35 | INFO     | __main__:shutdown:339 - Shutting down bot...
+2025-07-02 01:02:35 | SUCCESS  | __main__:shutdown:361 - Database connections closed
+2025-07-02 01:02:35 | SUCCESS  | __main__:shutdown:363 - Bot shutdown completed
+2025-07-02 01:02:35 | ERROR    | __main__:main:409 - Unexpected error: Could not parse SQLAlchemy URL from given URL string
+2025-07-02 01:02:35 | INFO     | __main__:shutdown:339 - Shutting down bot...
+2025-07-02 01:02:35 | SUCCESS  | __main__:shutdown:361 - Database connections closed
+2025-07-02 01:02:35 | SUCCESS  | __main__:shutdown:363 - Bot shutdown completed
+2025-07-02 01:02:44 | INFO     | config:load_config:64 - Configuration loaded successfully
+2025-07-02 01:02:44 | DEBUG    | config:load_config:65 - Webhook mode: False
+2025-07-02 01:02:44 | DEBUG    | config:load_config:66 - Admin users: 0
+2025-07-02 01:02:44 | DEBUG    | config:load_config:67 - Userbot enabled: False
+2025-07-02 01:02:44 | INFO     | __main__:initialize:50 - Initializing Telegram Forwarding Bot...
+2025-07-02 01:02:44 | ERROR    | database:initialize:139 - Failed to initialize database: Could not parse SQLAlchemy URL from given URL string
+2025-07-02 01:02:44 | ERROR    | __main__:initialize:126 - Failed to initialize bot: Could not parse SQLAlchemy URL from given URL string
+2025-07-02 01:02:44 | ERROR    | __main__:start:333 - Failed to start bot: Could not parse SQLAlchemy URL from given URL string
+2025-07-02 01:02:44 | INFO     | __main__:shutdown:339 - Shutting down bot...
+2025-07-02 01:02:44 | SUCCESS  | __main__:shutdown:361 - Database connections closed
+2025-07-02 01:02:44 | SUCCESS  | __main__:shutdown:363 - Bot shutdown completed
+2025-07-02 01:02:44 | ERROR    | __main__:main:409 - Unexpected error: Could not parse SQLAlchemy URL from given URL string
+2025-07-02 01:02:44 | INFO     | __main__:shutdown:339 - Shutting down bot...
+2025-07-02 01:02:44 | SUCCESS  | __main__:shutdown:361 - Database connections closed
+2025-07-02 01:02:44 | SUCCESS  | __main__:shutdown:363 - Bot shutdown completed
+2025-07-02 01:02:52 | INFO     | config:load_config:64 - Configuration loaded successfully
+2025-07-02 01:02:52 | DEBUG    | config:load_config:65 - Webhook mode: False
+2025-07-02 01:02:52 | DEBUG    | config:load_config:66 - Admin users: 0
+2025-07-02 01:02:52 | DEBUG    | config:load_config:67 - Userbot enabled: False
+2025-07-02 01:02:52 | INFO     | __main__:initialize:50 - Initializing Telegram Forwarding Bot...
+2025-07-02 01:02:52 | ERROR    | database:initialize:139 - Failed to initialize database: Multiple exceptions: [Errno 111] Connect call failed ('::1', 5432, 0, 0), [Errno 111] Connect call failed ('127.0.0.1', 5432)
+2025-07-02 01:02:52 | ERROR    | __main__:initialize:126 - Failed to initialize bot: Multiple exceptions: [Errno 111] Connect call failed ('::1', 5432, 0, 0), [Errno 111] Connect call failed ('127.0.0.1', 5432)
+2025-07-02 01:02:52 | ERROR    | __main__:start:333 - Failed to start bot: Multiple exceptions: [Errno 111] Connect call failed ('::1', 5432, 0, 0), [Errno 111] Connect call failed ('127.0.0.1', 5432)
+2025-07-02 01:02:52 | INFO     | __main__:shutdown:339 - Shutting down bot...
+2025-07-02 01:02:52 | INFO     | database:close:814 - Database engine disposed
+2025-07-02 01:02:52 | SUCCESS  | __main__:shutdown:361 - Database connections closed
+2025-07-02 01:02:52 | SUCCESS  | __main__:shutdown:363 - Bot shutdown completed
+2025-07-02 01:02:52 | ERROR    | __main__:main:409 - Unexpected error: Multiple exceptions: [Errno 111] Connect call failed ('::1', 5432, 0, 0), [Errno 111] Connect call failed ('127.0.0.1', 5432)
+2025-07-02 01:02:52 | INFO     | __main__:shutdown:339 - Shutting down bot...
+2025-07-02 01:02:52 | INFO     | database:close:814 - Database engine disposed
+2025-07-02 01:02:52 | SUCCESS  | __main__:shutdown:361 - Database connections closed
+2025-07-02 01:02:52 | SUCCESS  | __main__:shutdown:363 - Bot shutdown completed
+2025-07-02 01:04:27 | INFO     | config:load_config:68 - Configuration loaded successfully
+2025-07-02 01:04:27 | DEBUG    | config:load_config:69 - Webhook mode: True
+2025-07-02 01:04:27 | DEBUG    | config:load_config:70 - Admin users: 1
+2025-07-02 01:04:27 | DEBUG    | config:load_config:71 - Userbot enabled: False
+2025-07-02 01:04:27 | INFO     | __main__:initialize:50 - Initializing Telegram Forwarding Bot...
+2025-07-02 01:04:27 | ERROR    | database:initialize:139 - Failed to initialize database: [Errno -2] Name or service not known
+2025-07-02 01:04:27 | ERROR    | __main__:initialize:126 - Failed to initialize bot: [Errno -2] Name or service not known
+2025-07-02 01:04:27 | ERROR    | __main__:start:333 - Failed to start bot: [Errno -2] Name or service not known
+2025-07-02 01:04:27 | INFO     | __main__:shutdown:339 - Shutting down bot...
+2025-07-02 01:04:27 | INFO     | database:close:814 - Database engine disposed
+2025-07-02 01:04:27 | SUCCESS  | __main__:shutdown:361 - Database connections closed
+2025-07-02 01:04:27 | SUCCESS  | __main__:shutdown:363 - Bot shutdown completed
+2025-07-02 01:04:27 | ERROR    | __main__:main:409 - Unexpected error: [Errno -2] Name or service not known
+2025-07-02 01:04:27 | INFO     | __main__:shutdown:339 - Shutting down bot...
+2025-07-02 01:04:27 | INFO     | database:close:814 - Database engine disposed
+2025-07-02 01:04:27 | SUCCESS  | __main__:shutdown:361 - Database connections closed
+2025-07-02 01:04:27 | SUCCESS  | __main__:shutdown:363 - Bot shutdown completed
