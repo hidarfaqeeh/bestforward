@@ -646,6 +646,21 @@ Monitoring for forwarding results...
                 await callback.answer("🚫 Access denied.", show_alert=True)
                 return
 
+            # Ensure user exists in database before proceeding
+            user = await self.database.get_user_by_id(user_id)
+            if not user:
+                # Create user if doesn't exist
+                user_data = {
+                    "telegram_id": user_id,
+                    "username": callback.from_user.username,
+                    "first_name": callback.from_user.first_name,
+                    "last_name": callback.from_user.last_name,
+                    "is_admin": await self.security_manager.is_admin(user_id),
+                    "is_active": True
+                }
+                await self.database.create_or_update_user(user_data)
+                logger.info(f"Created user {user_id} during callback handling")
+
             # Handle session callbacks
             if data and data.startswith('session_'):
                 if self.session_handler:
