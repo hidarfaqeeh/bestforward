@@ -165,7 +165,7 @@ Choose your preferred language using the settings menu.
             # User Filter Settings
             "user_filter_title": "👥 **User Filter Settings**",
             "filter_verified_users": "✅ Filter Verified Users",
-            "filter_bots": "🤖 Filter Bots",
+            # "filter_bots": "🤖 Filter Bots",  # Removed - not implemented
             "user_whitelist": "✅ User Whitelist",
             "user_blacklist": "❌ User Blacklist",
             "manage_users": "👥 Manage Users",
@@ -453,7 +453,7 @@ Choose your preferred language using the settings menu.
             # User Filter Settings
             "user_filter_title": "👥 **إعدادات فلتر المستخدمين**",
             "filter_verified_users": "✅ فلترة المستخدمين المحققين",
-            "filter_bots": "🤖 فلترة البوتات",
+            # "filter_bots": "🤖 فلترة البوتات",  # Removed - not implemented
             "user_whitelist": "✅ القائمة البيضاء للمستخدمين",
             "user_blacklist": "❌ القائمة السوداء للمستخدمين",
             "manage_users": "👥 إدارة المستخدمين",

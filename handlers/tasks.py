@@ -517,9 +517,7 @@ class TaskHandlers:
             elif data.startswith("toggle_filter_language_"):
                 task_id = int(data.split("_")[-1])
                 await self._toggle_language_filter(callback, task_id, state)
-            elif data.startswith("toggle_filter_bots_"):
-                task_id = int(data.split("_")[-1])
-                await self._toggle_bot_filter(callback, task_id, state)
+            # toggle_filter_bots removed - not implemented
             elif data.startswith("clear_duplicates_"):
                 task_id = int(data.split("_")[-1])
                 await self._clear_duplicates(callback, task_id, state)
@@ -2615,11 +2613,11 @@ Settings are automatically saved.
             
             # Check current filter states
             filter_forwarded = settings.get('filter_forwarded', False) if settings else False
-            filter_bots = settings.get('filter_bots', False) if settings else False
+            # Removed filter_bots reference
             
             # Dynamic button text based on current state
             verified_text = "✅ Verified Only" if filter_forwarded else "❌ Verified Only"
-            nobots_text = "✅ No Bots" if filter_bots else "❌ No Bots"
+            nobots_text = "❌ No Bots"  # Default value
             
             # Add timestamp to ensure message content changes
             timestamp = int(time.time())
@@ -2636,7 +2634,7 @@ Configure filters based on message senders:
 
 Current Status:
 • Verified Filter: {"ON" if filter_forwarded else "OFF"}
-• Bot Filter: {"ON" if filter_bots else "OFF"}
+• Bot Filter: OFF
 
 Note: Some features require userbot mode for full functionality.
 
@@ -2685,24 +2683,14 @@ _Updated: {timestamp}_
             await callback.answer("❌ خطأ في تبديل فلتر التحقق", show_alert=True)
 
     async def _handle_toggle_bot_filter(self, callback: CallbackQuery, task_id: int, state: FSMContext):
-        """Toggle bot filter"""
+        """Toggle bot filter - Currently not implemented"""
         try:
-            settings = await self.database.get_task_settings(task_id)
-            current_value = settings.get("filter_bots", False) if settings else False
-            new_value = not current_value
-            
-            await self.database.execute_command(
-                "UPDATE task_settings SET filter_bots = $1 WHERE task_id = $2",
-                new_value, task_id
-            )
-            
-            status = "تفعيل" if new_value else "إلغاء"
-            await callback.answer(f"✅ تم {status} فلتر البوتات")
+            await callback.answer("⚠️ فلتر البوتات غير متاح حالياً", show_alert=True)
             await self._handle_user_filter(callback, task_id, state)
             
         except Exception as e:
-            logger.error(f"Error toggling bot filter: {e}")
-            await callback.answer("❌ خطأ في تبديل فلتر البوت", show_alert=True)
+            logger.error(f"Error in bot filter toggle: {e}")
+            await callback.answer("❌ خطأ في فلتر البوتات", show_alert=True)
 
     async def _handle_user_whitelist(self, callback: CallbackQuery, task_id: int, state: FSMContext):
         """Handle user whitelist management"""
@@ -3117,21 +3105,13 @@ advertisement, spam, annoying
                 logger.info("Processing user_nobots_ callback")
                 task_id = int(data.split("_")[2])
                 settings = await self.bot_controller.database.get_task_settings(task_id)
-                current_bots = settings.get('filter_bots', False) if settings else False
-                logger.info(f"Current bots filter state: {current_bots}")
+                # filter_bots column does not exist, show info message
+                logger.info("Bot filter requested but not implemented")
                 
-                # Toggle the setting
-                new_bots_setting = not current_bots
+                await callback.answer("⚠️ فلتر البوتات غير متاح حالياً", show_alert=True)
+                # Skip the database update since the column doesn't exist
                 
-                await self.bot_controller.database.execute_command(
-                    "UPDATE task_settings SET filter_bots = $1 WHERE task_id = $2",
-                    new_bots_setting, task_id
-                )
-                
-                status = "enabled" if new_bots_setting else "disabled"
-                await callback.answer(f"No bots filter: {status}")
-                
-                # Refresh the user filter interface to show updated button states
+                # Refresh the user filter interface
                 await self._handle_user_filter(callback, task_id, state)
                 
 
