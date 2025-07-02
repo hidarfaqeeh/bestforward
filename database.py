@@ -289,6 +289,56 @@ class Database:
         except Exception as e:
             logger.warning(f"Could not ensure task_type column in tasks table: {e}")
 
+        # Remove invalid columns from tasks table that shouldn't be there
+        try:
+            # Check if source_chat column exists and remove it
+            check_query = """
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name = 'tasks' AND column_name = 'source_chat'
+            """
+            result = await self.execute_query(check_query)
+            
+            if result:
+                logger.info("Found invalid 'source_chat' column in tasks table, removing it...")
+                await self.execute_command("ALTER TABLE tasks DROP COLUMN IF EXISTS source_chat")
+                logger.info("Removed invalid 'source_chat' column from tasks table")
+                
+        except Exception as e:
+            logger.warning(f"Could not remove invalid source_chat column: {e}")
+
+        # Check for other invalid columns that might exist
+        try:
+            # Get all columns in tasks table
+            columns_query = """
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name = 'tasks'
+            """
+            existing_columns = await self.execute_query(columns_query)
+            existing_column_names = [col['column_name'] for col in existing_columns] if existing_columns else []
+            
+            # Expected columns according to the Task model
+            expected_columns = {
+                'id', 'user_id', 'name', 'description', 'task_type', 
+                'is_active', 'created_at', 'updated_at'
+            }
+            
+            # Find unexpected columns
+            unexpected_columns = set(existing_column_names) - expected_columns
+            
+            if unexpected_columns:
+                logger.warning(f"Found unexpected columns in tasks table: {unexpected_columns}")
+                for col in unexpected_columns:
+                    try:
+                        await self.execute_command(f"ALTER TABLE tasks DROP COLUMN IF EXISTS {col}")
+                        logger.info(f"Removed unexpected column '{col}' from tasks table")
+                    except Exception as col_error:
+                        logger.warning(f"Could not remove column '{col}': {col_error}")
+                        
+        except Exception as e:
+            logger.warning(f"Could not check for unexpected columns: {e}")
+
     async def migrate_columns(self):
         """Add new columns if they don't exist"""
         try:
