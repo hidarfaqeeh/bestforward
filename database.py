@@ -111,12 +111,12 @@ class Database:
                 SystemSettings, MessageDuplicate
             )
 
-            # Create all tables
+            # First ensure users table exists before creating other tables
+            await self.ensure_users_table_structure()
+
+            # Now create all tables (this will create user_sessions with proper foreign key)
             async with self.engine.begin() as conn:
                 await conn.run_sync(Base.metadata.create_all)
-
-            # Ensure users table has id column (fix foreign key issues)
-            await self.ensure_users_table_structure()
 
             # Add new columns if they don't exist
             await self.migrate_columns()
@@ -126,9 +126,6 @@ class Database:
                 ALTER TABLE users 
                 ADD COLUMN IF NOT EXISTS language VARCHAR(10) DEFAULT 'ar'
             """)
-
-            # Create user_sessions table explicitly to avoid foreign key issues
-            await self.create_user_sessions_table()
 
             # Create additional tables for advanced features
             await self.create_advanced_tables()
@@ -142,7 +139,25 @@ class Database:
     async def ensure_users_table_structure(self):
         """Ensure users table has proper structure"""
         try:
-            # Check if users table exists and has id column
+            # First, try to drop and recreate the users table if it has issues
+            try:
+                # Check if the table exists and has the right structure
+                result = await self.execute_query("""
+                    SELECT column_name, data_type 
+                    FROM information_schema.columns 
+                    WHERE table_name = 'users' AND column_name = 'id'
+                """)
+                
+                if not result:
+                    # users table doesn't have id column, need to recreate
+                    logger.info("Users table missing id column, recreating...")
+                    await self.execute_command("DROP TABLE IF EXISTS users CASCADE")
+                    
+            except Exception:
+                # Table doesn't exist or query failed, that's fine
+                pass
+            
+            # Create users table with proper structure
             await self.execute_command("""
                 CREATE TABLE IF NOT EXISTS users (
                     id SERIAL PRIMARY KEY,
@@ -161,24 +176,7 @@ class Database:
         except Exception as e:
             logger.warning(f"Could not ensure users table structure: {e}")
 
-    async def create_user_sessions_table(self):
-        """Create user_sessions table with proper foreign key"""
-        try:
-            await self.execute_command("""
-                CREATE TABLE IF NOT EXISTS user_sessions (
-                    id SERIAL PRIMARY KEY,
-                    user_id INTEGER NOT NULL,
-                    session_data JSON,
-                    current_state VARCHAR(255),
-                    expires_at TIMESTAMP,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
-                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
-                )
-            """)
-            logger.info("Created user_sessions table")
-        except Exception as e:
-            logger.warning(f"Could not create user_sessions table: {e}")
+
 
     async def migrate_columns(self):
         """Add new columns if they don't exist"""
