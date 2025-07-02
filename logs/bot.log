@@ -13248,3 +13248,21 @@ Length limit
 2025-07-02 02:13:57 | INFO     | database:close:812 - Database engine disposed
 2025-07-02 02:13:57 | SUCCESS  | __main__:shutdown:361 - Database connections closed
 2025-07-02 02:13:57 | SUCCESS  | __main__:shutdown:363 - Bot shutdown completed
+2025-07-02 02:16:08 | INFO     | config:load_config:68 - Configuration loaded successfully
+2025-07-02 02:16:08 | DEBUG    | config:load_config:69 - Webhook mode: True
+2025-07-02 02:16:08 | DEBUG    | config:load_config:70 - Admin users: 1
+2025-07-02 02:16:08 | DEBUG    | config:load_config:71 - Userbot enabled: False
+2025-07-02 02:16:08 | INFO     | __main__:initialize:50 - Initializing Telegram Forwarding Bot...
+2025-07-02 02:16:08 | ERROR    | database:initialize:151 - Database connection failed: Cannot resolve hostname. Check network connectivity and DATABASE_URL
+2025-07-02 02:16:08 | ERROR    | database:initialize:152 - Database URL: postgresql://_1425c5f9c74c65a0:_999a41707187da20f76e96235bb16e@primary.masirah--r6txhb4fkw5n.addon.code.run:5432/_7d6463eec104?sslmode=require
+2025-07-02 02:16:08 | ERROR    | __main__:initialize:126 - Failed to initialize bot: [Errno -2] Name or service not known
+2025-07-02 02:16:08 | ERROR    | __main__:start:333 - Failed to start bot: [Errno -2] Name or service not known
+2025-07-02 02:16:08 | INFO     | __main__:shutdown:339 - Shutting down bot...
+2025-07-02 02:16:08 | INFO     | database:close:835 - Database engine disposed
+2025-07-02 02:16:08 | SUCCESS  | __main__:shutdown:361 - Database connections closed
+2025-07-02 02:16:08 | SUCCESS  | __main__:shutdown:363 - Bot shutdown completed
+2025-07-02 02:16:08 | ERROR    | __main__:main:409 - Unexpected error: [Errno -2] Name or service not known
+2025-07-02 02:16:08 | INFO     | __main__:shutdown:339 - Shutting down bot...
+2025-07-02 02:16:08 | INFO     | database:close:835 - Database engine disposed
+2025-07-02 02:16:08 | SUCCESS  | __main__:shutdown:361 - Database connections closed
+2025-07-02 02:16:08 | SUCCESS  | __main__:shutdown:363 - Bot shutdown completed
