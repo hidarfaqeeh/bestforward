@@ -197,6 +197,12 @@ class Database:
             async with self.engine.begin() as conn:
                 await conn.run_sync(Base.metadata.create_all)
 
+            # Create additional tables for advanced features
+            await self.create_advanced_tables()
+
+            # Ensure critical columns exist before other migrations
+            await self._ensure_critical_columns()
+
             # Add new columns if they don't exist
             await self.migrate_columns()
 
@@ -271,7 +277,17 @@ class Database:
         except Exception as e:
             logger.warning(f"Could not ensure users table structure: {e}")
 
-
+    async def _ensure_critical_columns(self):
+        """Ensure critical columns exist in tables"""
+        try:
+            # Ensure task_type column exists in tasks table
+            await self.execute_command("""
+                ALTER TABLE tasks 
+                ADD COLUMN IF NOT EXISTS task_type VARCHAR(50) DEFAULT 'bot' NOT NULL
+            """)
+            logger.info("Ensured task_type column exists in tasks table")
+        except Exception as e:
+            logger.warning(f"Could not ensure task_type column in tasks table: {e}")
 
     async def migrate_columns(self):
         """Add new columns if they don't exist"""
