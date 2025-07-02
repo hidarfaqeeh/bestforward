@@ -3398,7 +3398,42 @@ advertisement, spam, annoying
                 
             elif action == "import_keywords":
                 # Handle import functionality
-                await message.answer("📥 Import feature is under development...")
+                # Start import process
+        import_text = """📥 **استيراد المهام**
+
+يمكنك استيراد المهام بإحدى الطرق التالية:
+
+1️⃣ **ملف JSON**: أرسل ملف JSON يحتوي على بيانات المهام
+2️⃣ **نص JSON**: الصق نص JSON مباشرة
+3️⃣ **نسخ من بوت آخر**: استورد إعدادات من بوت مماثل
+
+📋 **تنسيق الملف المطلوب:**
+```json
+{
+  "tasks": [
+    {
+      "name": "اسم المهمة",
+      "description": "وصف المهمة", 
+      "sources": [
+        {"chat_id": -1001234567890, "title": "القناة المصدر"}
+      ],
+      "targets": [
+        {"chat_id": -1001234567891, "title": "القناة الهدف"}
+      ],
+      "settings": {
+        "forward_mode": "copy",
+        "delay_min": 1,
+        "delay_max": 5
+      }
+    }
+  ]
+}
+```
+
+أرسل الملف أو النص الآن:"""
+
+        await message.answer(import_text, parse_mode="Markdown")
+        await state.set_state("TaskStates:WAITING_IMPORT_DATA")
                 await state.clear()
             
             elif action == "add_target_words":
@@ -5830,6 +5865,9 @@ Footer: `───────────────
                 if task_id:
                     await self._handle_add_suffix(message, task_id, message.text, state)
                     return
+            elif current_state == "TaskStates:WAITING_IMPORT_DATA":
+                await self._handle_import_data(message, state)
+                return
             
             # Handle various input types based on awaiting_input
             if awaiting_input and task_id:
@@ -13744,3 +13782,130 @@ _تحديث: {timestamp}_"""
         except Exception as e:
             logger.error(f"Error clearing all filters: {e}")
             await callback.answer("❌ خطأ في مسح الفلاتر", show_alert=True)
+
+    async def _handle_import_data(self, message: Message, state: FSMContext):
+        """Handle importing task data from JSON"""
+        try:
+            import json
+            user_id = message.from_user.id
+            
+            # Check if user sent a document
+            if message.document:
+                # Download and process document
+                if message.document.mime_type == "application/json" or message.document.file_name.endswith(".json"):
+                    try:
+                        # Download file
+                        file_info = await self.bot_controller.bot.get_file(message.document.file_id)
+                        file_content = await self.bot_controller.bot.download_file(file_info.file_path)
+                        
+                        # Parse JSON
+                        import_data = json.loads(file_content.read().decode("utf-8"))
+                        
+                    except Exception as e:
+                        await message.answer("❌ خطأ في قراءة الملف. تأكد من أن الملف صالح وبتنسيق JSON")
+                        return
+                else:
+                    await message.answer("❌ نوع الملف غير مدعوم. يرجى إرسال ملف JSON فقط")
+                    return
+                    
+            elif message.text:
+                # Process text as JSON
+                try:
+                    import_data = json.loads(message.text.strip())
+                except json.JSONDecodeError:
+                    await message.answer("❌ النص المرسل ليس بتنسيق JSON صالح")
+                    return
+            else:
+                await message.answer("❌ يرجى إرسال ملف JSON أو نص JSON")
+                return
+            
+            # Validate data structure
+            if not isinstance(import_data, dict) or "tasks" not in import_data:
+                await message.answer("❌ بنية البيانات غير صحيحة. يجب أن تحتوي على مفتاح tasks")
+                return
+            
+            tasks_data = import_data["tasks"]
+            if not isinstance(tasks_data, list):
+                await message.answer("❌ tasks يجب أن يكون قائمة")
+                return
+            
+            # Process each task
+            imported_count = 0
+            errors = []
+            
+            for i, task_data in enumerate(tasks_data):
+                try:
+                    await self._import_single_task(user_id, task_data, i + 1)
+                    imported_count += 1
+                except Exception as e:
+                    errors.append(f"المهمة {i + 1}: {str(e)}")
+            
+            # Send results
+            result_text = f"📥 **نتائج الاستيراد**\\n\\n"
+            result_text += f"✅ تم استيراد {imported_count} مهمة بنجاح\\n"
+            
+            if errors:
+                result_text += f"❌ فشل في استيراد {len(errors)} مهمة:\\n"
+                for error in errors[:5]:  # Show first 5 errors
+                    result_text += f"• {error}\\n"
+                if len(errors) > 5:
+                    result_text += f"• ... و {len(errors) - 5} أخطاء أخرى\\n"
+            
+            result_text += f"\\n🎯 يمكنك الآن مراجعة المهام المستوردة من القائمة الرئيسية"
+            
+            await message.answer(result_text, parse_mode="Markdown")
+            await state.clear()
+            
+        except Exception as e:
+            logger.error(f"Error in import data handler: {e}")
+            await message.answer("❌ خطأ عام في عملية الاستيراد")
+            await state.clear()
+
+    async def _import_single_task(self, user_id: int, task_data: dict, task_number: int):
+        """Import a single task from data"""
+        try:
+            # Validate required fields
+            if "name" not in task_data:
+                raise ValueError("اسم المهمة مطلوب")
+            
+            task_name = task_data["name"]
+            task_description = task_data.get("description", "")
+            
+            # Create task
+            result = await self.bot_controller.database.execute_query(
+                """INSERT INTO tasks (user_id, name, description, is_active, created_at, updated_at) 
+                   VALUES ($1, $2, $3, true, NOW(), NOW()) RETURNING id""",
+                user_id, task_name, task_description
+            )
+            
+            if not result:
+                raise ValueError("فشل في إنشاء المهمة")
+            
+            task_id = result[0]["id"]
+            
+            # Import sources
+            if "sources" in task_data and isinstance(task_data["sources"], list):
+                for source in task_data["sources"]:
+                    if "chat_id" in source:
+                        await self.bot_controller.database.execute_command(
+                            """INSERT INTO sources (task_id, chat_id, chat_title, is_active, created_at) 
+                               VALUES ($1, $2, $3, true, NOW())""",
+                            task_id, source["chat_id"], source.get("title", "مستورد")
+                        )
+            
+            # Import targets
+            if "targets" in task_data and isinstance(task_data["targets"], list):
+                for target in task_data["targets"]:
+                    if "chat_id" in target:
+                        await self.bot_controller.database.execute_command(
+                            """INSERT INTO targets (task_id, chat_id, chat_title, is_active, created_at) 
+                               VALUES ($1, $2, $3, true, NOW())""",
+                            task_id, target["chat_id"], target.get("title", "مستورد")
+                        )
+            
+            logger.info(f"Successfully imported task {task_name} with ID {task_id}")
+            
+        except Exception as e:
+            logger.error(f"Error importing task {task_number}: {e}")
+            raise ValueError(f"خطأ في المهمة {task_number}: {str(e)}")
+

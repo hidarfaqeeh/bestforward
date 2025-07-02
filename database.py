@@ -25,32 +25,23 @@ class Database:
         # Store original URL
         self.original_url = database_url
         
-        # Clean URL by removing SSL parameters that cause issues with asyncpg
+        # Handle SSL parameters properly for Northflank/production environments
         import urllib.parse
         parsed = urllib.parse.urlparse(database_url)
 
-        # Remove query parameters (like sslmode)
-        clean_url = urllib.parse.urlunparse((
-            parsed.scheme,
-            parsed.netloc,
-            parsed.path,
-            '',  # params
-            '',  # query - removing SSL parameters
-            ''   # fragment
-        ))
-
-        self.database_url = clean_url
+        # Keep SSL parameters but handle them properly
+        self.database_url = database_url
         
         # Handle different database types
-        if clean_url.startswith("sqlite"):
-            self.async_database_url = clean_url.replace("sqlite://", "sqlite+aiosqlite://")
+        if self.database_url.startswith("sqlite"):
+            self.async_database_url = self.database_url.replace("sqlite://", "sqlite+aiosqlite://")
             self.is_postgresql = False
-        elif clean_url.startswith("postgresql"):
-            self.async_database_url = clean_url.replace("postgresql://", "postgresql+asyncpg://")
+        elif self.database_url.startswith("postgresql"):
+            self.async_database_url = self.database_url.replace("postgresql://", "postgresql+asyncpg://")
             self.is_postgresql = True
         else:
-            self.async_database_url = clean_url
-            self.is_postgresql = "postgresql" in clean_url
+            self.async_database_url = self.database_url
+            self.is_postgresql = "postgresql" in self.database_url
             
         self.engine = None
         self.async_session_factory = None
@@ -61,13 +52,22 @@ class Database:
         try:
             # Create async engine with different settings for SQLite vs PostgreSQL
             if self.is_postgresql:
+                # Configure engine with SSL support for production environments
+                engine_args = {
+                    "echo": False,
+                    "pool_size": 20,
+                    "max_overflow": 30,
+                    "pool_pre_ping": True,
+                    "pool_recycle": 3600,
+                }
+                
+                # Add SSL configuration if required
+                if 'sslmode=require' in self.original_url:
+                    engine_args["connect_args"] = {"ssl": "require"}
+                
                 self.engine = create_async_engine(
                     self.async_database_url,
-                    echo=False,
-                    pool_size=20,
-                    max_overflow=30,
-                    pool_pre_ping=True,
-                    pool_recycle=3600,
+                    **engine_args
                 )
             else:
                 # SQLite configuration
@@ -89,13 +89,26 @@ class Database:
                 import urllib.parse
                 parsed_url = urllib.parse.urlparse(self.original_url)
 
-                # Create connection pool with explicit parameters to avoid SSL issues
+                # Extract SSL mode from query parameters
+                query_params = urllib.parse.parse_qs(parsed_url.query)
+                ssl_mode = query_params.get('sslmode', ['prefer'])[0]
+                
+                # Configure SSL context for production environments
+                ssl_context = None
+                if ssl_mode == 'require':
+                    import ssl
+                    ssl_context = ssl.create_default_context()
+                    ssl_context.check_hostname = False
+                    ssl_context.verify_mode = ssl.CERT_NONE
+
+                # Create connection pool with proper SSL configuration
                 self.pool = await asyncpg.create_pool(
                     host=parsed_url.hostname,
                     port=parsed_url.port or 5432,
                     user=parsed_url.username,
                     password=parsed_url.password,
                     database=parsed_url.path.lstrip('/'),
+                    ssl=ssl_context,
                     min_size=5,
                     max_size=20,
                     command_timeout=60
@@ -130,10 +143,23 @@ class Database:
             # Create additional tables for advanced features
             await self.create_advanced_tables()
 
+            # Add missing indexes for performance
+            await self.create_performance_indexes()
+
             logger.success("Database initialized successfully")
 
         except Exception as e:
-            logger.error(f"Failed to initialize database: {e}")
+            error_msg = str(e)
+            if "Name or service not known" in error_msg:
+                logger.error(f"Database connection failed: Cannot resolve hostname. Check network connectivity and DATABASE_URL")
+                logger.error(f"Database URL: {self.original_url}")
+            elif "Connection refused" in error_msg:
+                logger.error(f"Database connection refused: Check if database server is running and accessible")
+            elif "SSL" in error_msg or "certificate" in error_msg:
+                logger.error(f"SSL/TLS connection error: {error_msg}")
+                logger.error("Try adjusting SSL settings in DATABASE_URL")
+            else:
+                logger.error(f"Failed to initialize database: {e}")
             raise
 
     async def ensure_users_table_structure(self):
@@ -532,6 +558,34 @@ class Database:
             logger.info("Created recurring_posts table")
         except Exception as e:
             logger.warning(f"Could not create recurring_posts table: {e}")
+
+    async def create_performance_indexes(self):
+        """Create performance indexes for better query speed"""
+        try:
+            indexes = [
+                "CREATE INDEX IF NOT EXISTS idx_forwarding_logs_task_date ON forwarding_logs(task_id, processed_at)",
+                "CREATE INDEX IF NOT EXISTS idx_message_tracking_hash ON message_tracking(message_hash)",
+                "CREATE INDEX IF NOT EXISTS idx_users_last_activity ON users(last_activity)",
+                "CREATE INDEX IF NOT EXISTS idx_tasks_user_active ON tasks(user_id, is_active)",
+                "CREATE INDEX IF NOT EXISTS idx_sources_task_active ON sources(task_id, is_active)",
+                "CREATE INDEX IF NOT EXISTS idx_targets_task_active ON targets(task_id, is_active)",
+                "CREATE INDEX IF NOT EXISTS idx_task_settings_task_id ON task_settings(task_id)",
+                "CREATE INDEX IF NOT EXISTS idx_message_duplicates_task_hash ON message_duplicates(task_id, message_hash)",
+                "CREATE INDEX IF NOT EXISTS idx_manual_approvals_status ON manual_approvals(status, created_at)",
+                "CREATE INDEX IF NOT EXISTS idx_task_statistics_task ON task_statistics(task_id)",
+                "CREATE INDEX IF NOT EXISTS idx_forwarding_logs_status ON forwarding_logs(status, processed_at)"
+            ]
+            
+            for index_sql in indexes:
+                try:
+                    await self.execute_command(index_sql)
+                except Exception as e:
+                    logger.warning(f"Could not create index: {e}")
+            
+            logger.info("Performance indexes created")
+            
+        except Exception as e:
+            logger.error(f"Error creating performance indexes: {e}")
 
     @asynccontextmanager
     async def get_session(self):
