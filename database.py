@@ -143,6 +143,9 @@ class Database:
             # Create additional tables for advanced features
             await self.create_advanced_tables()
 
+            # Add missing indexes for performance
+            await self.create_performance_indexes()
+
             logger.success("Database initialized successfully")
 
         except Exception as e:
@@ -555,6 +558,34 @@ class Database:
             logger.info("Created recurring_posts table")
         except Exception as e:
             logger.warning(f"Could not create recurring_posts table: {e}")
+
+    async def create_performance_indexes(self):
+        """Create performance indexes for better query speed"""
+        try:
+            indexes = [
+                "CREATE INDEX IF NOT EXISTS idx_forwarding_logs_task_date ON forwarding_logs(task_id, processed_at)",
+                "CREATE INDEX IF NOT EXISTS idx_message_tracking_hash ON message_tracking(message_hash)",
+                "CREATE INDEX IF NOT EXISTS idx_users_last_activity ON users(last_activity)",
+                "CREATE INDEX IF NOT EXISTS idx_tasks_user_active ON tasks(user_id, is_active)",
+                "CREATE INDEX IF NOT EXISTS idx_sources_task_active ON sources(task_id, is_active)",
+                "CREATE INDEX IF NOT EXISTS idx_targets_task_active ON targets(task_id, is_active)",
+                "CREATE INDEX IF NOT EXISTS idx_task_settings_task_id ON task_settings(task_id)",
+                "CREATE INDEX IF NOT EXISTS idx_message_duplicates_task_hash ON message_duplicates(task_id, message_hash)",
+                "CREATE INDEX IF NOT EXISTS idx_manual_approvals_status ON manual_approvals(status, created_at)",
+                "CREATE INDEX IF NOT EXISTS idx_task_statistics_task ON task_statistics(task_id)",
+                "CREATE INDEX IF NOT EXISTS idx_forwarding_logs_status ON forwarding_logs(status, processed_at)"
+            ]
+            
+            for index_sql in indexes:
+                try:
+                    await self.execute_command(index_sql)
+                except Exception as e:
+                    logger.warning(f"Could not create index: {e}")
+            
+            logger.info("Performance indexes created")
+            
+        except Exception as e:
+            logger.error(f"Error creating performance indexes: {e}")
 
     @asynccontextmanager
     async def get_session(self):

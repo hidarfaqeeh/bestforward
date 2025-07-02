@@ -60,14 +60,18 @@ class ForwardingEngine:
         
         # Rate limiting
         self.rate_limits: Dict[str, List[float]] = {}
+        self.rate_limit_window = 60  # 1 minute window
+        self.max_requests_per_minute = 30  # Max 30 requests per minute per chat
         
         # Translation service
         self.translator = Translator()
         
-        # Advanced features cache
+        # Advanced features cache with TTL
         self._settings_cache: Dict[int, Dict[str, Any]] = {}
         self._cache_timestamp: Dict[int, float] = {}
         self.duplicate_tracker: Set[str] = set()
+        self._cache_size_limit = 1000  # Limit cache size
+        self._duplicate_cleanup_interval = 3600  # Clean duplicates every hour
         
         # Task cache
         self.active_tasks_cache: Dict[int, Dict[str, Any]] = {}
@@ -2822,6 +2826,35 @@ class ForwardingEngine:
                 
         except Exception as e:
             logger.error(f"Error applying delay: {e}")
+
+    async def _check_rate_limit(self, chat_id: int) -> bool:
+        """Check if rate limit is exceeded for a chat"""
+        try:
+            current_time = time.time()
+            chat_key = str(chat_id)
+            
+            # Initialize if not exists
+            if chat_key not in self.rate_limits:
+                self.rate_limits[chat_key] = []
+            
+            # Clean old entries outside the window
+            self.rate_limits[chat_key] = [
+                timestamp for timestamp in self.rate_limits[chat_key]
+                if current_time - timestamp < self.rate_limit_window
+            ]
+            
+            # Check if limit exceeded
+            if len(self.rate_limits[chat_key]) >= self.max_requests_per_minute:
+                logger.warning(f"Rate limit exceeded for chat {chat_id}")
+                return False  # Rate limit exceeded
+            
+            # Add current request
+            self.rate_limits[chat_key].append(current_time)
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error checking rate limit: {e}")
+            return True  # Allow on error
     
     async def _log_forwarding(self, task_id: int, source_chat_id: int, target_chat_id: int, 
                              message_id: int, forwarded_message_id: Optional[int], 
@@ -2869,6 +2902,10 @@ class ForwardingEngine:
                     datetime.now() - self.cache_last_update > timedelta(seconds=self.cache_ttl)):
                     await self._reload_tasks()
                 
+                # Clean up caches every 10 minutes
+                if time.time() % 600 < 60:  # Every 10 minutes
+                    await self._cleanup_caches()
+                
                 # Clean up old logs every hour
                 if time.time() % 3600 < 60:  # Once per hour
                     await self.database.cleanup_old_logs()
@@ -2881,6 +2918,44 @@ class ForwardingEngine:
             except Exception as e:
                 logger.error(f"Error in background tasks: {e}")
                 await asyncio.sleep(60)
+
+    async def _cleanup_caches(self):
+        """Clean up caches to prevent memory leaks"""
+        try:
+            current_time = time.time()
+            
+            # Clean settings cache - remove entries older than 1 hour
+            cache_ttl = 3600  # 1 hour
+            expired_keys = [
+                key for key, timestamp in self._cache_timestamp.items()
+                if current_time - timestamp > cache_ttl
+            ]
+            
+            for key in expired_keys:
+                self._settings_cache.pop(key, None)
+                self._cache_timestamp.pop(key, None)
+            
+            # Limit cache size
+            if len(self._settings_cache) > self._cache_size_limit:
+                # Remove oldest entries
+                sorted_keys = sorted(self._cache_timestamp.items(), key=lambda x: x[1])
+                keys_to_remove = [key for key, _ in sorted_keys[:len(sorted_keys) - self._cache_size_limit]]
+                for key in keys_to_remove:
+                    self._settings_cache.pop(key, None)
+                    self._cache_timestamp.pop(key, None)
+            
+            # Clean duplicate tracker - keep only recent entries
+            if len(self.duplicate_tracker) > 10000:
+                self.duplicate_tracker = set(list(self.duplicate_tracker)[-5000:])
+            
+            # Clean processing times - keep only last 1000 entries
+            if len(self.processing_times) > 1000:
+                self.processing_times = self.processing_times[-500:]
+            
+            logger.debug(f"Cache cleanup completed. Cache size: {len(self._settings_cache)}, Duplicates: {len(self.duplicate_tracker)}")
+            
+        except Exception as e:
+            logger.error(f"Error cleaning caches: {e}")
     
     async def _reload_tasks(self):
         """Reload active tasks and update monitors"""

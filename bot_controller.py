@@ -313,7 +313,7 @@ class BotController:
 
         except Exception as e:
             logger.error(f"Error in start command: {e}")
-            await message.answer("❌ An error occurred. Please try again later.")
+            await message.answer("❌ حدث خطأ في بدء البوت. الرجاء المحاولة لاحقاً أو التواصل مع المطور.")
 
     async def help_command(self, message: Message):
         """Handle /help command"""
