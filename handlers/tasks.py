@@ -265,6 +265,12 @@ class TaskHandlers:
                 await self._handle_task_settings(callback, state)
             elif data.startswith("task_info_"):
                 await self._handle_task_info(callback, state)
+            elif data.startswith("task_edit_name_"):
+                await self._handle_task_edit_name(callback, state)
+            elif data.startswith("task_edit_desc_"):
+                await self._handle_task_edit_description(callback, state)
+            elif data.startswith("task_edit_type_"):
+                await self._handle_task_change_type(callback, state)
             elif data.startswith("task_list_page_"):
                 await self._handle_task_list_pagination(callback, state)
             elif data.startswith("task_delete_"):
@@ -13908,4 +13914,620 @@ _تحديث: {timestamp}_"""
         except Exception as e:
             logger.error(f"Error importing task {task_number}: {e}")
             raise ValueError(f"خطأ في المهمة {task_number}: {str(e)}")
+
+    # === Missing Task Edit Handlers ===
+
+    async def _handle_task_edit_name(self, callback: CallbackQuery, state: FSMContext):
+        """Handle task name editing"""
+        try:
+            task_id = int(callback.data.split("_")[-1])
+            
+            # Verify task ownership
+            task = await self.task_manager.get_task(task_id)
+            if not task or task["user_telegram_id"] != callback.from_user.id:
+                await callback.answer("❌ Access denied.", show_alert=True)
+                return
+            
+            edit_text = f"""✏️ **تعديل اسم المهمة**
+
+الاسم الحالي: `{task['name']}`
+
+أرسل الاسم الجديد للمهمة:
+
+⚠️ **ملاحظة:** الاسم يجب أن يكون واضحاً ومميزاً للمهمة"""
+
+            keyboard = InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="❌ إلغاء", callback_data=f"task_edit_{task_id}")]
+            ])
+
+            await callback.message.edit_text(edit_text, reply_markup=keyboard, parse_mode="Markdown")
+            await state.set_state("editing_task_name")
+            await state.update_data(task_id=task_id)
+            await callback.answer()
+
+        except Exception as e:
+            logger.error(f"Error in task edit name: {e}")
+            await callback.answer("❌ خطأ في تعديل اسم المهمة", show_alert=True)
+
+    async def _handle_task_edit_description(self, callback: CallbackQuery, state: FSMContext):
+        """Handle task description editing"""
+        try:
+            task_id = int(callback.data.split("_")[-1])
+            
+            # Verify task ownership
+            task = await self.task_manager.get_task(task_id)
+            if not task or task["user_telegram_id"] != callback.from_user.id:
+                await callback.answer("❌ Access denied.", show_alert=True)
+                return
+            
+            current_desc = task.get('description', 'لا يوجد وصف')
+            
+            edit_text = f"""📝 **تعديل وصف المهمة**
+
+الوصف الحالي:
+```
+{current_desc}
+```
+
+أرسل الوصف الجديد للمهمة:
+
+💡 **نصائح:**
+• اجعل الوصف واضحاً ومفيداً
+• يمكن أن يحتوي على تفاصيل عن الهدف من المهمة
+• أو اتركه فارغاً إذا لم تحتج وصفاً"""
+
+            keyboard = InlineKeyboardMarkup(inline_keyboard=[
+                [
+                    InlineKeyboardButton(text="🗑️ حذف الوصف", callback_data=f"task_clear_desc_{task_id}"),
+                    InlineKeyboardButton(text="❌ إلغاء", callback_data=f"task_edit_{task_id}")
+                ]
+            ])
+
+            await callback.message.edit_text(edit_text, reply_markup=keyboard, parse_mode="Markdown")
+            await state.set_state("editing_task_description")
+            await state.update_data(task_id=task_id)
+            await callback.answer()
+
+        except Exception as e:
+            logger.error(f"Error in task edit description: {e}")
+            await callback.answer("❌ خطأ في تعديل وصف المهمة", show_alert=True)
+
+    async def _handle_task_change_type(self, callback: CallbackQuery, state: FSMContext):
+        """Handle task type changing"""
+        try:
+            task_id = int(callback.data.split("_")[-1])
+            
+            # Verify task ownership
+            task = await self.task_manager.get_task(task_id)
+            if not task or task["user_telegram_id"] != callback.from_user.id:
+                await callback.answer("❌ Access denied.", show_alert=True)
+                return
+            
+            current_type = task.get('task_type', 'bot')
+            
+            type_text = f"""🔄 **تغيير نوع المهمة**
+
+النوع الحالي: **{current_type.upper()}**
+
+**أنواع المهام المتاحة:**
+
+🤖 **Bot API**
+• يستخدم واجهة البوت العادية
+• أبطأ قليلاً لكن أكثر استقراراً
+• مناسب للاستخدام العام
+
+👤 **Userbot**
+• يستخدم حساب مستخدم عادي
+• أسرع وأكثر مرونة
+• يتطلب تسجيل دخول بالهاتف
+
+اختر النوع الجديد:"""
+
+            keyboard = InlineKeyboardMarkup(inline_keyboard=[
+                [
+                    InlineKeyboardButton(
+                        text="🤖 Bot API" + (" ✅" if current_type == "bot" else ""),
+                        callback_data=f"set_task_type_bot_{task_id}"
+                    ),
+                    InlineKeyboardButton(
+                        text="👤 Userbot" + (" ✅" if current_type == "userbot" else ""),
+                        callback_data=f"set_task_type_userbot_{task_id}"
+                    )
+                ],
+                [
+                    InlineKeyboardButton(text="❌ إلغاء", callback_data=f"task_edit_{task_id}")
+                ]
+            ])
+
+            await callback.message.edit_text(type_text, reply_markup=keyboard, parse_mode="Markdown")
+            await callback.answer()
+
+        except Exception as e:
+            logger.error(f"Error in task change type: {e}")
+            await callback.answer("❌ خطأ في تغيير نوع المهمة", show_alert=True)
+
+    # === Content Setting Handler ===
+
+    async def _handle_content_setting(self, callback: CallbackQuery, state: FSMContext):
+        """Handle content settings main menu"""
+        try:
+            data = callback.data
+            if "_" in data:
+                task_id = int(data.split("_")[-1])
+            else:
+                await callback.answer("❌ خطأ في معرف المهمة", show_alert=True)
+                return
+            
+            # Verify task ownership
+            task = await self.task_manager.get_task(task_id)
+            if not task or task["user_telegram_id"] != callback.from_user.id:
+                await callback.answer("❌ Access denied.", show_alert=True)
+                return
+
+            content_text = f"""📝 **إعدادات المحتوى** - {task['name']}
+
+**إدارة محتوى الرسائل:**
+قم بتخصيص كيفية معالجة وتعديل محتوى الرسائل المُوجهة
+
+**الخيارات المتاحة:**
+• استبدال النصوص
+• إضافة بادئة ولاحقة  
+• تنسيق النصوص
+• إدارة الأزرار التفاعلية
+• تنظيف النصوص
+• إدارة الروابط"""
+
+            keyboard = [
+                [
+                    InlineKeyboardButton(text="🔄 استبدال النص", callback_data=f"content_replace_{task_id}"),
+                    InlineKeyboardButton(text="📝 بادئة/لاحقة", callback_data=f"content_prefix_{task_id}")
+                ],
+                [
+                    InlineKeyboardButton(text="🎨 التنسيق", callback_data=f"content_formatting_{task_id}"),
+                    InlineKeyboardButton(text="🔘 الأزرار التفاعلية", callback_data=f"content_inline_buttons_{task_id}")
+                ],
+                [
+                    InlineKeyboardButton(text="🧹 منظف النصوص", callback_data=f"content_cleaner_{task_id}"),
+                    InlineKeyboardButton(text="🔗 إدارة الروابط", callback_data=f"content_links_{task_id}")
+                ],
+                [
+                    InlineKeyboardButton(text="🔙 العودة للإعدادات", callback_data=f"task_settings_{task_id}")
+                ]
+            ]
+
+            markup = InlineKeyboardMarkup(inline_keyboard=keyboard)
+            await callback.message.edit_text(content_text, reply_markup=markup, parse_mode="Markdown")
+            await callback.answer()
+
+        except Exception as e:
+            logger.error(f"Error in content setting: {e}")
+            await callback.answer("❌ خطأ في إعدادات المحتوى", show_alert=True)
+
+    # === Limits Setting Handler ===
+
+    async def _handle_limits_setting(self, callback: CallbackQuery, state: FSMContext):
+        """Handle limits settings"""
+        try:
+            data = callback.data
+            if "_" in data:
+                task_id = int(data.split("_")[-1])
+            else:
+                await callback.answer("❌ خطأ في معرف المهمة", show_alert=True)
+                return
+            
+            # Verify task ownership
+            task = await self.task_manager.get_task(task_id)
+            if not task or task["user_telegram_id"] != callback.from_user.id:
+                await callback.answer("❌ Access denied.", show_alert=True)
+                return
+
+            settings = await self.bot_controller.database.get_task_settings(task_id) or {}
+            
+            # Get current limit settings
+            delay_min = settings.get("delay_min", 0)
+            delay_max = settings.get("delay_max", 5)
+            max_length = settings.get("max_message_length", 4096)
+            daily_limit = settings.get("daily_limit", 0)
+            hourly_limit = settings.get("hourly_limit", 0)
+            
+            limits_text = f"""⏱️ **إعدادات الحدود** - {task['name']}
+
+**الحدود الحالية:**
+• التأخير: {delay_min}-{delay_max} ثانية
+• طول الرسالة: {max_length} حرف
+• الحد اليومي: {daily_limit if daily_limit > 0 else 'غير محدود'} رسالة
+• الحد بالساعة: {hourly_limit if hourly_limit > 0 else 'غير محدود'} رسالة
+
+**فوائد الحدود:**
+• منع الحظر من تليجرام
+• التحكم في معدل الإرسال
+• إدارة استهلاك الموارد
+• ضمان الاستقرار"""
+
+            keyboard = [
+                [
+                    InlineKeyboardButton(text="⏱️ تأخير الإرسال", callback_data=f"limits_delay_{task_id}"),
+                    InlineKeyboardButton(text="📏 طول الرسالة", callback_data=f"limits_length_{task_id}")
+                ],
+                [
+                    InlineKeyboardButton(text="📅 حد يومي", callback_data=f"limits_daily_{task_id}"),
+                    InlineKeyboardButton(text="🕐 حد بالساعة", callback_data=f"limits_hourly_{task_id}")
+                ],
+                [
+                    InlineKeyboardButton(text="🚫 حدود المحتوى", callback_data=f"limits_content_{task_id}"),
+                    InlineKeyboardButton(text="👥 حدود المستخدمين", callback_data=f"limits_users_{task_id}")
+                ],
+                [
+                    InlineKeyboardButton(text="📊 إحصائيات الحدود", callback_data=f"limits_stats_{task_id}"),
+                    InlineKeyboardButton(text="🔄 إعادة تعيين", callback_data=f"limits_reset_{task_id}")
+                ],
+                [
+                    InlineKeyboardButton(text="🔙 العودة للإعدادات", callback_data=f"task_settings_{task_id}")
+                ]
+            ]
+
+            markup = InlineKeyboardMarkup(inline_keyboard=keyboard)
+            await callback.message.edit_text(limits_text, reply_markup=markup, parse_mode="Markdown")
+            await callback.answer()
+
+        except Exception as e:
+            logger.error(f"Error in limits setting: {e}")
+            await callback.answer("❌ خطأ في إعدادات الحدود", show_alert=True)
+
+    # === Missing Text Replace Handler ===
+
+    async def _handle_text_replace_setting(self, callback: CallbackQuery, task_id: int, state: FSMContext):
+        """Handle text replacement settings"""
+        try:
+            settings = await self.bot_controller.database.get_task_settings(task_id) or {}
+            replace_text = settings.get("replace_text", {})
+            
+            if isinstance(replace_text, str):
+                try:
+                    import json
+                    replace_text = json.loads(replace_text)
+                except:
+                    replace_text = {}
+            
+            rules_count = len(replace_text) if isinstance(replace_text, dict) else 0
+            
+            replace_text_content = f"""🔄 **إعدادات استبدال النص**
+
+**القواعد الحالية:** {rules_count} قاعدة
+
+**كيف يعمل:**
+• استبدال كلمات أو عبارات معينة
+• يمكن استبدال النص بنص آخر أو حذفه
+• يطبق على جميع الرسائل المُوجهة
+
+**أمثلة على الاستخدام:**
+• تغيير أسماء القنوات
+• حذف الروابط الدعائية
+• تصحيح الأخطاء الإملائية
+• ترجمة كلمات محددة"""
+
+            keyboard = []
+            
+            # Show current rules (max 5)
+            if replace_text and isinstance(replace_text, dict):
+                rules_shown = 0
+                for old_text, new_text in list(replace_text.items())[:5]:
+                    rules_shown += 1
+                    display_old = old_text[:15] + "..." if len(old_text) > 15 else old_text
+                    display_new = new_text[:15] + "..." if len(new_text) > 15 else new_text
+                    if not new_text:  # Empty replacement means deletion
+                        display_new = "[حذف]"
+                    
+                    keyboard.append([
+                        InlineKeyboardButton(
+                            text=f"📝 {display_old} → {display_new}",
+                            callback_data=f"edit_replace_rule_{task_id}_{rules_shown-1}"
+                        )
+                    ])
+                
+                if len(replace_text) > 5:
+                    keyboard.append([
+                        InlineKeyboardButton(
+                            text=f"... +{len(replace_text) - 5} قواعد أخرى",
+                            callback_data=f"view_all_replace_{task_id}"
+                        )
+                    ])
+
+            # Action buttons
+            keyboard.extend([
+                [
+                    InlineKeyboardButton(text="➕ إضافة قاعدة", callback_data=f"add_replace_rule_{task_id}"),
+                    InlineKeyboardButton(text="📋 عرض الكل", callback_data=f"view_all_replace_{task_id}")
+                ],
+                [
+                    InlineKeyboardButton(text="🧪 اختبار", callback_data=f"test_replace_{task_id}"),
+                    InlineKeyboardButton(text="🗑️ مسح الكل", callback_data=f"clear_replace_{task_id}")
+                ],
+                [
+                    InlineKeyboardButton(text="📥 استيراد", callback_data=f"import_replace_{task_id}"),
+                    InlineKeyboardButton(text="📤 تصدير", callback_data=f"export_replace_{task_id}")
+                ],
+                [
+                    InlineKeyboardButton(text="🔙 العودة للمحتوى", callback_data=f"setting_content_{task_id}")
+                ]
+            ])
+
+            markup = InlineKeyboardMarkup(inline_keyboard=keyboard)
+            await callback.message.edit_text(replace_text_content, reply_markup=markup, parse_mode="Markdown")
+            await callback.answer()
+
+        except Exception as e:
+            logger.error(f"Error in text replace setting: {e}")
+            await callback.answer("❌ خطأ في إعدادات استبدال النص", show_alert=True)
+
+    # === Missing Formatting Handler ===
+
+    async def _handle_formatting_setting(self, callback: CallbackQuery, task_id: int, state: FSMContext):
+        """Handle text formatting settings"""
+        try:
+            settings = await self.bot_controller.database.get_task_settings(task_id) or {}
+            format_settings = settings.get("format_settings", {})
+            
+            if isinstance(format_settings, str):
+                try:
+                    import json
+                    format_settings = json.loads(format_settings)
+                except:
+                    format_settings = {}
+            
+            # Get current formatting options
+            bold_text = format_settings.get("bold_text", False)
+            italic_text = format_settings.get("italic_text", False)
+            underline_text = format_settings.get("underline_text", False)
+            strikethrough_text = format_settings.get("strikethrough_text", False)
+            monospace_text = format_settings.get("monospace_text", False)
+            remove_formatting = format_settings.get("remove_formatting", False)
+            custom_markdown = format_settings.get("custom_markdown", False)
+            
+            formatting_text = f"""📄 **إعدادات التنسيق**
+
+**التنسيقات المُفعلة:**
+{'✅' if bold_text else '❌'} النص الغامق
+{'✅' if italic_text else '❌'} النص المائل  
+{'✅' if underline_text else '❌'} النص المسطر
+{'✅' if strikethrough_text else '❌'} النص المشطوب
+{'✅' if monospace_text else '❌'} النص الأحادي
+{'✅' if remove_formatting else '❌'} إزالة كل التنسيق
+{'✅' if custom_markdown else '❌'} تنسيق مخصص
+
+**ملاحظات:**
+• يطبق التنسيق على كامل النص
+• إزالة التنسيق تلغي كل التنسيقات الموجودة
+• التنسيق المخصص يسمح بقواعد متقدمة"""
+
+            keyboard = [
+                [
+                    InlineKeyboardButton(
+                        text=f"{'✅' if bold_text else '❌'} نص غامق",
+                        callback_data=f"toggle_format_bold_{task_id}"
+                    ),
+                    InlineKeyboardButton(
+                        text=f"{'✅' if italic_text else '❌'} نص مائل",
+                        callback_data=f"toggle_format_italic_{task_id}"
+                    )
+                ],
+                [
+                    InlineKeyboardButton(
+                        text=f"{'✅' if underline_text else '❌'} نص مسطر",
+                        callback_data=f"toggle_format_underline_{task_id}"
+                    ),
+                    InlineKeyboardButton(
+                        text=f"{'✅' if strikethrough_text else '❌'} نص مشطوب",
+                        callback_data=f"toggle_format_strikethrough_{task_id}"
+                    )
+                ],
+                [
+                    InlineKeyboardButton(
+                        text=f"{'✅' if monospace_text else '❌'} نص أحادي",
+                        callback_data=f"toggle_format_monospace_{task_id}"
+                    ),
+                    InlineKeyboardButton(
+                        text=f"{'✅' if remove_formatting else '❌'} إزالة التنسيق",
+                        callback_data=f"toggle_format_remove_{task_id}"
+                    )
+                ],
+                [
+                    InlineKeyboardButton(
+                        text=f"⚙️ تنسيق مخصص",
+                        callback_data=f"custom_formatting_{task_id}"
+                    ),
+                    InlineKeyboardButton(
+                        text=f"🧪 اختبار التنسيق",
+                        callback_data=f"test_formatting_{task_id}"
+                    )
+                ],
+                [
+                    InlineKeyboardButton(text="🔄 إعادة تعيين", callback_data=f"reset_formatting_{task_id}"),
+                    InlineKeyboardButton(text="💾 حفظ", callback_data=f"save_formatting_{task_id}")
+                ],
+                [
+                    InlineKeyboardButton(text="🔙 العودة للمحتوى", callback_data=f"setting_content_{task_id}")
+                ]
+            ]
+
+            markup = InlineKeyboardMarkup(inline_keyboard=keyboard)
+            await callback.message.edit_text(formatting_text, reply_markup=markup, parse_mode="Markdown")
+            await callback.answer()
+
+        except Exception as e:
+            logger.error(f"Error in formatting setting: {e}")
+            await callback.answer("❌ خطأ في إعدادات التنسيق", show_alert=True)
+
+    # === Missing Inline Buttons Handler ===
+
+    async def _handle_inline_buttons_setting(self, callback: CallbackQuery, task_id: int, state: FSMContext):
+        """Handle inline buttons settings"""
+        try:
+            settings = await self.bot_controller.database.get_task_settings(task_id) or {}
+            inline_buttons = settings.get("inline_buttons", [])
+            filter_inline_buttons = settings.get("filter_inline_buttons", False)
+            
+            if isinstance(inline_buttons, str):
+                try:
+                    import json
+                    inline_buttons = json.loads(inline_buttons)
+                except:
+                    inline_buttons = []
+            
+            buttons_count = len(inline_buttons) if isinstance(inline_buttons, list) else 0
+            
+            buttons_text = f"""🔘 **إعدادات الأزرار التفاعلية**
+
+**حالة الفلتر:** {'✅ مُفعل - حظر الأزرار' if filter_inline_buttons else '❌ معطل - السماح بالأزرار'}
+**الأزرار المُضافة:** {buttons_count} زر
+
+**وظائف الأزرار:**
+• إضافة أزرار تفاعلية للرسائل المُوجهة
+• إنشاء روابط أو إجراءات مخصصة
+• تخصيص شكل ونص الأزرار
+• ترتيب الأزرار في صفوف
+
+**أنواع الأزرار:**
+• روابط خارجية (URL)
+• روابط قنوات أو مجموعات
+• أزرار إجراءات مخصصة"""
+
+            keyboard = [
+                [
+                    InlineKeyboardButton(
+                        text=f"🚫 فلتر الأزرار: {'مُفعل' if filter_inline_buttons else 'معطل'}",
+                        callback_data=f"toggle_filter_buttons_{task_id}"
+                    )
+                ]
+            ]
+            
+            # Show current buttons (max 5)
+            if inline_buttons and isinstance(inline_buttons, list):
+                for i, button in enumerate(inline_buttons[:5]):
+                    if isinstance(button, dict) and "text" in button:
+                        button_text = button["text"][:20] + "..." if len(button["text"]) > 20 else button["text"]
+                        keyboard.append([
+                            InlineKeyboardButton(
+                                text=f"🔘 {button_text}",
+                                callback_data=f"edit_inline_button_{task_id}_{i}"
+                            )
+                        ])
+                
+                if len(inline_buttons) > 5:
+                    keyboard.append([
+                        InlineKeyboardButton(
+                            text=f"... +{len(inline_buttons) - 5} أزرار أخرى",
+                            callback_data=f"view_all_buttons_{task_id}"
+                        )
+                    ])
+
+            # Action buttons
+            keyboard.extend([
+                [
+                    InlineKeyboardButton(text="➕ إضافة زر", callback_data=f"add_inline_button_{task_id}"),
+                    InlineKeyboardButton(text="📋 عرض الكل", callback_data=f"view_all_buttons_{task_id}")
+                ],
+                [
+                    InlineKeyboardButton(text="🎨 تخصيص التخطيط", callback_data=f"customize_layout_{task_id}"),
+                    InlineKeyboardButton(text="🧪 معاينة", callback_data=f"preview_buttons_{task_id}")
+                ],
+                [
+                    InlineKeyboardButton(text="📥 استيراد", callback_data=f"import_buttons_{task_id}"),
+                    InlineKeyboardButton(text="📤 تصدير", callback_data=f"export_buttons_{task_id}")
+                ],
+                [
+                    InlineKeyboardButton(text="🗑️ مسح الكل", callback_data=f"clear_buttons_{task_id}"),
+                    InlineKeyboardButton(text="💾 حفظ", callback_data=f"save_buttons_{task_id}")
+                ],
+                [
+                    InlineKeyboardButton(text="🔙 العودة للمحتوى", callback_data=f"setting_content_{task_id}")
+                ]
+            ])
+
+            markup = InlineKeyboardMarkup(inline_keyboard=keyboard)
+            await callback.message.edit_text(buttons_text, reply_markup=markup, parse_mode="Markdown")
+            await callback.answer()
+
+        except Exception as e:
+            logger.error(f"Error in inline buttons setting: {e}")
+            await callback.answer("❌ خطأ في إعدادات الأزرار التفاعلية", show_alert=True)
+
+    # === Missing Filters Handler ===
+
+    async def _handle_filters_setting(self, callback: CallbackQuery, state: FSMContext):
+        """Handle filters settings main menu"""
+        try:
+            data = callback.data
+            if "_" in data:
+                task_id = int(data.split("_")[-1])
+            else:
+                await callback.answer("❌ خطأ في معرف المهمة", show_alert=True)
+                return
+            
+            # Verify task ownership
+            task = await self.task_manager.get_task(task_id)
+            if not task or task["user_telegram_id"] != callback.from_user.id:
+                await callback.answer("❌ Access denied.", show_alert=True)
+                return
+
+            settings = await self.bot_controller.database.get_task_settings(task_id) or {}
+            
+            # Check filter statuses
+            filter_media = settings.get("filter_media", False)
+            filter_text = settings.get("filter_text", False)
+            filter_forwarded = settings.get("filter_forwarded", False)
+            filter_links = settings.get("filter_links", False)
+            filter_inline_buttons = settings.get("filter_inline_buttons", False)
+            filter_duplicates = settings.get("filter_duplicates", False)
+            filter_language = settings.get("filter_language", False)
+            
+            filters_text = f"""🔽 **إعدادات الفلاتر** - {task['name']}
+
+**حالة الفلاتر:**
+{'✅' if filter_media else '❌'} فلتر الوسائط
+{'✅' if filter_text else '❌'} فلتر النصوص
+{'✅' if filter_forwarded else '❌'} فلتر المُوجهة
+{'✅' if filter_links else '❌'} فلتر الروابط
+{'✅' if filter_inline_buttons else '❌'} فلتر الأزرار
+{'✅' if filter_duplicates else '❌'} فلتر المكررة
+{'✅' if filter_language else '❌'} فلتر اللغة
+
+**وظائف الفلاتر:**
+• منع أو السماح بأنواع محددة من المحتوى
+• التحكم في جودة الرسائل المُوجهة
+• تخصيص معايير الفلترة"""
+
+            keyboard = [
+                [
+                    InlineKeyboardButton(text="📷 فلاتر الوسائط", callback_data=f"filter_media_types_{task_id}"),
+                    InlineKeyboardButton(text="📝 فلاتر النصوص", callback_data=f"filter_text_types_{task_id}")
+                ],
+                [
+                    InlineKeyboardButton(text="🔗 فلاتر الروابط", callback_data=f"filter_links_types_{task_id}"),
+                    InlineKeyboardButton(text="🔘 فلاتر الأزرار", callback_data=f"filter_buttons_types_{task_id}")
+                ],
+                [
+                    InlineKeyboardButton(text="👥 فلاتر المستخدمين", callback_data=f"filter_users_{task_id}"),
+                    InlineKeyboardButton(text="🌍 فلاتر اللغة", callback_data=f"filter_languages_{task_id}")
+                ],
+                [
+                    InlineKeyboardButton(text="🔄 فلتر المكررة", callback_data=f"filter_duplicates_{task_id}"),
+                    InlineKeyboardButton(text="📏 فلتر الطول", callback_data=f"filter_length_{task_id}")
+                ],
+                [
+                    InlineKeyboardButton(text="⚙️ إعدادات متقدمة", callback_data=f"filter_advanced_{task_id}"),
+                    InlineKeyboardButton(text="🗑️ مسح الكل", callback_data=f"filter_clear_{task_id}")
+                ],
+                [
+                    InlineKeyboardButton(text="🔙 العودة للإعدادات", callback_data=f"task_settings_{task_id}")
+                ]
+            ]
+
+            markup = InlineKeyboardMarkup(inline_keyboard=keyboard)
+            await callback.message.edit_text(filters_text, reply_markup=markup, parse_mode="Markdown")
+            await callback.answer()
+
+        except Exception as e:
+            logger.error(f"Error in filters setting: {e}")
+            await callback.answer("❌ خطأ في إعدادات الفلاتر", show_alert=True)
 
