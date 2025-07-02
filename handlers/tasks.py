@@ -517,25 +517,52 @@ class TaskHandlers:
             # Advanced forward settings toggles
             elif data.startswith("toggle_manual_mode_"):
                 task_id = int(data.split("_")[-1])
-                await self._toggle_manual_mode(callback, task_id, state)
+                await self._handle_toggle_manual_mode(callback, task_id, state)
             elif data.startswith("toggle_link_preview_"):
                 task_id = int(data.split("_")[-1])
-                await self._toggle_link_preview(callback, task_id, state)
+                await self._handle_toggle_link_preview(callback, task_id, state)
             elif data.startswith("toggle_pin_messages_"):
                 task_id = int(data.split("_")[-1])
-                await self._toggle_pin_messages(callback, task_id, state)
+                await self._handle_toggle_pin_messages(callback, task_id, state)
             elif data.startswith("toggle_silent_mode_"):
                 task_id = int(data.split("_")[-1])
-                await self._toggle_silent_mode(callback, task_id, state)
+                await self._handle_toggle_silent_mode(callback, task_id, state)
             elif data.startswith("toggle_sync_edits_"):
                 task_id = int(data.split("_")[-1])
-                await self._toggle_sync_edits(callback, task_id, state)
+                await self._handle_toggle_sync_edits(callback, task_id, state)
             elif data.startswith("toggle_sync_deletes_"):
                 task_id = int(data.split("_")[-1])
-                await self._toggle_sync_deletes(callback, task_id, state)
+                await self._handle_toggle_sync_deletes(callback, task_id, state)
             elif data.startswith("toggle_preserve_replies_"):
                 task_id = int(data.split("_")[-1])
-                await self._toggle_preserve_replies(callback, task_id, state)
+                await self._handle_toggle_preserve_replies(callback, task_id, state)
+            elif data.startswith("forward_other_"):
+                task_id = int(data.split("_")[-1])
+                await self._handle_forward_other_settings(callback, task_id, state)
+            
+            # Media filter actions
+            elif data.startswith("media_enable_all_"):
+                task_id = int(data.split("_")[-1])
+                await self._handle_media_enable_all(callback, task_id, state)
+            elif data.startswith("media_disable_all_"):
+                task_id = int(data.split("_")[-1])
+                await self._handle_media_disable_all(callback, task_id, state)
+            elif data.startswith("media_reset_"):
+                task_id = int(data.split("_")[-1])
+                await self._handle_media_reset(callback, task_id, state)
+            elif data.startswith("media_save_"):
+                task_id = int(data.split("_")[-1])
+                await self._handle_media_save(callback, task_id, state)
+            elif data.startswith("media_type_"):
+                parts = data.split("_")
+                task_id = int(parts[-2])
+                media_type = parts[-1]
+                await self._handle_media_type_toggle(callback, task_id, media_type, state)
+            
+            # Filter management
+            elif data.startswith("filter_clear_"):
+                task_id = int(data.split("_")[-1])
+                await self._handle_filter_clear_all(callback, task_id, state)
             # Text Cleaner handlers
             elif data.startswith("cleaner_links_toggle_"):
                 task_id = int(data.split("_")[-1])
@@ -13317,3 +13344,403 @@ _تحديث: {timestamp}_"""
         except Exception as e:
             logger.error(f"Error in suffix edit: {e}")
             await callback.answer("❌ خطأ في تعديل اللاحقة", show_alert=True)
+
+    # === Missing Forward Settings Handlers ===
+
+    async def _handle_toggle_manual_mode(self, callback: CallbackQuery, task_id: int, state: FSMContext):
+        """Toggle manual mode for forwarding"""
+        try:
+            settings = await self.bot_controller.database.get_task_settings(task_id)
+            current_value = settings.get("manual_mode", False) if settings else False
+            new_value = not current_value
+            
+            await self.bot_controller.database.update_task_settings(task_id, {"manual_mode": new_value})
+            
+            status = "تفعيل" if new_value else "إلغاء"
+            await callback.answer(f"✅ تم {status} الوضع اليدوي")
+            
+            # Refresh forward settings
+            await self._handle_forward_setting(callback, task_id, state)
+            
+        except Exception as e:
+            logger.error(f"Error toggling manual mode: {e}")
+            await callback.answer("❌ خطأ في تغيير الوضع اليدوي", show_alert=True)
+
+    async def _handle_toggle_link_preview(self, callback: CallbackQuery, task_id: int, state: FSMContext):
+        """Toggle link preview in forwarding"""
+        try:
+            settings = await self.bot_controller.database.get_task_settings(task_id)
+            current_value = settings.get("link_preview", True) if settings else True
+            new_value = not current_value
+            
+            await self.bot_controller.database.update_task_settings(task_id, {"link_preview": new_value})
+            
+            status = "تفعيل" if new_value else "إلغاء"
+            await callback.answer(f"✅ تم {status} معاينة الروابط")
+            
+            # Refresh forward settings
+            await self._handle_forward_setting(callback, task_id, state)
+            
+        except Exception as e:
+            logger.error(f"Error toggling link preview: {e}")
+            await callback.answer("❌ خطأ في تغيير معاينة الروابط", show_alert=True)
+
+    async def _handle_toggle_pin_messages(self, callback: CallbackQuery, task_id: int, state: FSMContext):
+        """Toggle pin messages in forwarding"""
+        try:
+            settings = await self.bot_controller.database.get_task_settings(task_id)
+            current_value = settings.get("pin_messages", False) if settings else False
+            new_value = not current_value
+            
+            await self.bot_controller.database.update_task_settings(task_id, {"pin_messages": new_value})
+            
+            status = "تفعيل" if new_value else "إلغاء"
+            await callback.answer(f"✅ تم {status} تثبيت الرسائل")
+            
+            # Refresh forward settings
+            await self._handle_forward_setting(callback, task_id, state)
+            
+        except Exception as e:
+            logger.error(f"Error toggling pin messages: {e}")
+            await callback.answer("❌ خطأ في تغيير تثبيت الرسائل", show_alert=True)
+
+    async def _handle_toggle_silent_mode(self, callback: CallbackQuery, task_id: int, state: FSMContext):
+        """Toggle silent mode in forwarding"""
+        try:
+            settings = await self.bot_controller.database.get_task_settings(task_id)
+            current_value = settings.get("silent_mode", False) if settings else False
+            new_value = not current_value
+            
+            await self.bot_controller.database.update_task_settings(task_id, {"silent_mode": new_value})
+            
+            status = "تفعيل" if new_value else "إلغاء"
+            await callback.answer(f"✅ تم {status} الوضع الصامت")
+            
+            # Refresh forward settings
+            await self._handle_forward_setting(callback, task_id, state)
+            
+        except Exception as e:
+            logger.error(f"Error toggling silent mode: {e}")
+            await callback.answer("❌ خطأ في تغيير الوضع الصامت", show_alert=True)
+
+    async def _handle_toggle_sync_deletes(self, callback: CallbackQuery, task_id: int, state: FSMContext):
+        """Toggle synchronize deletes in forwarding"""
+        try:
+            settings = await self.bot_controller.database.get_task_settings(task_id)
+            current_value = settings.get("sync_deletes", False) if settings else False
+            new_value = not current_value
+            
+            await self.bot_controller.database.update_task_settings(task_id, {"sync_deletes": new_value})
+            
+            status = "تفعيل" if new_value else "إلغاء"
+            await callback.answer(f"✅ تم {status} مزامنة الحذف")
+            
+            # Refresh forward settings
+            await self._handle_forward_setting(callback, task_id, state)
+            
+        except Exception as e:
+            logger.error(f"Error toggling sync deletes: {e}")
+            await callback.answer("❌ خطأ في تغيير مزامنة الحذف", show_alert=True)
+
+    async def _handle_toggle_preserve_replies(self, callback: CallbackQuery, task_id: int, state: FSMContext):
+        """Toggle preserve replies in forwarding"""
+        try:
+            settings = await self.bot_controller.database.get_task_settings(task_id)
+            current_value = settings.get("preserve_replies", False) if settings else False
+            new_value = not current_value
+            
+            await self.bot_controller.database.update_task_settings(task_id, {"preserve_replies": new_value})
+            
+            status = "تفعيل" if new_value else "إلغاء"
+            await callback.answer(f"✅ تم {status} المحافظة على الردود")
+            
+            # Refresh forward settings
+            await self._handle_forward_setting(callback, task_id, state)
+            
+        except Exception as e:
+            logger.error(f"Error toggling preserve replies: {e}")
+            await callback.answer("❌ خطأ في تغيير المحافظة على الردود", show_alert=True)
+
+    async def _handle_toggle_sync_edits(self, callback: CallbackQuery, task_id: int, state: FSMContext):
+        """Toggle synchronize edits in forwarding"""
+        try:
+            settings = await self.bot_controller.database.get_task_settings(task_id)
+            current_value = settings.get("sync_edits", False) if settings else False
+            new_value = not current_value
+            
+            await self.bot_controller.database.update_task_settings(task_id, {"sync_edits": new_value})
+            
+            status = "تفعيل" if new_value else "إلغاء"
+            await callback.answer(f"✅ تم {status} مزامنة التعديل")
+            
+            # Refresh forward settings
+            await self._handle_forward_setting(callback, task_id, state)
+            
+        except Exception as e:
+            logger.error(f"Error toggling sync edits: {e}")
+            await callback.answer("❌ خطأ في تغيير مزامنة التعديل", show_alert=True)
+
+    async def _handle_forward_other_settings(self, callback: CallbackQuery, task_id: int, state: FSMContext):
+        """Handle other forward settings"""
+        try:
+            settings = await self.bot_controller.database.get_task_settings(task_id) or {}
+            
+            # Get current values
+            protect_content = settings.get("protect_content", False)
+            disable_web_preview = settings.get("disable_web_preview", False)
+            parse_mode = settings.get("parse_mode", "HTML")
+            
+            settings_text = f"""⚙️ **إعدادات توجيه أخرى**
+
+**حماية المحتوى:**
+{'✅' if protect_content else '❌'} منع الحفظ والنسخ
+
+**معاينة الويب:**
+{'✅' if not disable_web_preview else '❌'} عرض معاينة المواقع
+
+**وضع التحليل:**
+📝 {parse_mode}
+
+**خيارات إضافية:**
+• حماية المحتوى من النسخ
+• تعطيل معاينة الروابط
+• تخصيص وضع التحليل
+• إعدادات الأمان المتقدمة"""
+
+            keyboard = InlineKeyboardMarkup(inline_keyboard=[
+                [
+                    InlineKeyboardButton(
+                        text=f"{'✅' if protect_content else '❌'} حماية المحتوى",
+                        callback_data=f"toggle_protect_content_{task_id}"
+                    )
+                ],
+                [
+                    InlineKeyboardButton(
+                        text=f"{'✅' if not disable_web_preview else '❌'} معاينة الويب",
+                        callback_data=f"toggle_web_preview_{task_id}"
+                    )
+                ],
+                [
+                    InlineKeyboardButton(text=f"📝 وضع التحليل: {parse_mode}", callback_data=f"set_parse_mode_{task_id}")
+                ],
+                [
+                    InlineKeyboardButton(text="🔒 إعدادات الأمان", callback_data=f"forward_security_{task_id}"),
+                    InlineKeyboardButton(text="⚡ إعدادات الأداء", callback_data=f"forward_performance_{task_id}")
+                ],
+                [
+                    InlineKeyboardButton(text="🔙 العودة للتوجيه", callback_data=f"setting_forward_{task_id}")
+                ]
+            ])
+
+            await callback.message.edit_text(settings_text, reply_markup=keyboard, parse_mode="Markdown")
+            await callback.answer()
+
+        except Exception as e:
+            logger.error(f"Error in forward other settings: {e}")
+            await callback.answer("❌ خطأ في عرض الإعدادات الأخرى", show_alert=True)
+
+    # === Missing Media Filters Handlers ===
+
+    async def _handle_media_enable_all(self, callback: CallbackQuery, task_id: int, state: FSMContext):
+        """Enable all media types"""
+        try:
+            media_settings = {
+                "allow_photos": True,
+                "allow_videos": True,
+                "allow_documents": True,
+                "allow_audio": True,
+                "allow_voice": True,
+                "allow_video_notes": True,
+                "allow_stickers": True,
+                "allow_animations": True,
+                "allow_contacts": True,
+                "allow_locations": True,
+                "allow_venues": True,
+                "allow_polls": True,
+                "allow_dice": True,
+                "allow_text": True
+            }
+            
+            await self.bot_controller.database.update_task_settings(task_id, media_settings)
+            await callback.answer("✅ تم تفعيل جميع أنواع الوسائط")
+            
+            # Refresh media types keyboard
+            await self._handle_filter_media_types(callback, task_id, state)
+            
+        except Exception as e:
+            logger.error(f"Error enabling all media: {e}")
+            await callback.answer("❌ خطأ في تفعيل الوسائط", show_alert=True)
+
+    async def _handle_media_disable_all(self, callback: CallbackQuery, task_id: int, state: FSMContext):
+        """Disable all media types"""
+        try:
+            media_settings = {
+                "allow_photos": False,
+                "allow_videos": False,
+                "allow_documents": False,
+                "allow_audio": False,
+                "allow_voice": False,
+                "allow_video_notes": False,
+                "allow_stickers": False,
+                "allow_animations": False,
+                "allow_contacts": False,
+                "allow_locations": False,
+                "allow_venues": False,
+                "allow_polls": False,
+                "allow_dice": False,
+                "allow_text": False
+            }
+            
+            await self.bot_controller.database.update_task_settings(task_id, media_settings)
+            await callback.answer("❌ تم تعطيل جميع أنواع الوسائط")
+            
+            # Refresh media types keyboard
+            await self._handle_filter_media_types(callback, task_id, state)
+            
+        except Exception as e:
+            logger.error(f"Error disabling all media: {e}")
+            await callback.answer("❌ خطأ في تعطيل الوسائط", show_alert=True)
+
+    async def _handle_media_reset(self, callback: CallbackQuery, task_id: int, state: FSMContext):
+        """Reset media types to default"""
+        try:
+            # Default media settings (all enabled)
+            media_settings = {
+                "allow_photos": True,
+                "allow_videos": True,
+                "allow_documents": True,
+                "allow_audio": True,
+                "allow_voice": True,
+                "allow_video_notes": True,
+                "allow_stickers": True,
+                "allow_animations": True,
+                "allow_contacts": True,
+                "allow_locations": True,
+                "allow_venues": True,
+                "allow_polls": True,
+                "allow_dice": True,
+                "allow_text": True
+            }
+            
+            await self.bot_controller.database.update_task_settings(task_id, media_settings)
+            await callback.answer("🔄 تم إعادة تعيين إعدادات الوسائط للافتراضية")
+            
+            # Refresh media types keyboard
+            await self._handle_filter_media_types(callback, task_id, state)
+            
+        except Exception as e:
+            logger.error(f"Error resetting media: {e}")
+            await callback.answer("❌ خطأ في إعادة تعيين الوسائط", show_alert=True)
+
+    async def _handle_media_save(self, callback: CallbackQuery, task_id: int, state: FSMContext):
+        """Save current media settings"""
+        try:
+            # Get current settings for confirmation
+            settings = await self.bot_controller.database.get_task_settings(task_id) or {}
+            
+            enabled_count = sum(1 for key in [
+                "allow_photos", "allow_videos", "allow_documents", "allow_audio",
+                "allow_voice", "allow_video_notes", "allow_stickers", "allow_animations",
+                "allow_contacts", "allow_locations", "allow_venues", "allow_polls", "allow_dice", "allow_text"
+            ] if settings.get(key, True))
+            
+            total_count = 14  # Total number of media types
+            
+            await callback.answer(f"💾 تم حفظ الإعدادات - مفعل: {enabled_count}/{total_count}")
+            
+            # Return to filters menu
+            await self._handle_filters_setting(callback, task_id, state)
+            
+        except Exception as e:
+            logger.error(f"Error saving media settings: {e}")
+            await callback.answer("❌ خطأ في حفظ الإعدادات", show_alert=True)
+
+    async def _handle_media_type_toggle(self, callback: CallbackQuery, task_id: int, media_type: str, state: FSMContext):
+        """Toggle specific media type"""
+        try:
+            settings = await self.bot_controller.database.get_task_settings(task_id) or {}
+            current_value = settings.get(media_type, True)
+            new_value = not current_value
+            
+            await self.bot_controller.database.update_task_settings(task_id, {media_type: new_value})
+            
+            # Get media type display name
+            type_names = {
+                "allow_photos": "الصور",
+                "allow_videos": "الفيديو",
+                "allow_documents": "المستندات",
+                "allow_audio": "الصوت",
+                "allow_voice": "الرسائل الصوتية",
+                "allow_video_notes": "الفيديو المدور",
+                "allow_stickers": "الملصقات",
+                "allow_animations": "الصور المتحركة",
+                "allow_contacts": "جهات الاتصال",
+                "allow_locations": "المواقع",
+                "allow_venues": "الأماكن",
+                "allow_polls": "الاستطلاعات",
+                "allow_dice": "النرد",
+                "allow_text": "النصوص"
+            }
+            
+            type_name = type_names.get(media_type, media_type)
+            status = "تفعيل" if new_value else "إلغاء"
+            await callback.answer(f"✅ تم {status} {type_name}")
+            
+            # Refresh media types keyboard
+            await self._handle_filter_media_types(callback, task_id, state)
+            
+        except Exception as e:
+            logger.error(f"Error toggling media type {media_type}: {e}")
+            await callback.answer("❌ خطأ في تغيير نوع الوسائط", show_alert=True)
+
+    # === Filter Management Handlers ===
+
+    async def _handle_filter_clear_all(self, callback: CallbackQuery, task_id: int, state: FSMContext):
+        """Clear all filters"""
+        try:
+            # Reset all filter settings to default
+            filter_settings = {
+                # Media filters
+                "allow_photos": True,
+                "allow_videos": True,
+                "allow_documents": True,
+                "allow_audio": True,
+                "allow_voice": True,
+                "allow_video_notes": True,
+                "allow_stickers": True,
+                "allow_animations": True,
+                "allow_contacts": True,
+                "allow_locations": True,
+                "allow_venues": True,
+                "allow_polls": True,
+                "allow_dice": True,
+                "allow_text": True,
+                
+                # Content filters
+                "keywords": [],
+                "blocked_keywords": [],
+                "min_length": 0,
+                "max_length": 0,
+                
+                # User filters
+                "user_whitelist": [],
+                "user_blacklist": [],
+                "verified_only": False,
+                "no_bots": False,
+                
+                # Other filters
+                "allow_forwarded": True,
+                "allow_links": True,
+                "allow_buttons": True,
+                "language_filter": []
+            }
+            
+            await self.bot_controller.database.update_task_settings(task_id, filter_settings)
+            await callback.answer("🗑️ تم مسح جميع الفلاتر وإعادة تعيينها للإعدادات الافتراضية")
+            
+            # Return to filters menu
+            await self._handle_filters_setting(callback, task_id, state)
+            
+        except Exception as e:
+            logger.error(f"Error clearing all filters: {e}")
+            await callback.answer("❌ خطأ في مسح الفلاتر", show_alert=True)
