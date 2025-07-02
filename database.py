@@ -107,12 +107,16 @@ class Database:
             # Import models to ensure they're registered
             from models import (
                 User, Task, Source, Target, TaskSettings, 
-                ForwardingLog, TaskStatistics
+                ForwardingLog, TaskStatistics, UserSession,
+                SystemSettings, MessageDuplicate
             )
 
             # Create all tables
             async with self.engine.begin() as conn:
                 await conn.run_sync(Base.metadata.create_all)
+
+            # Ensure users table has id column (fix foreign key issues)
+            await self.ensure_users_table_structure()
 
             # Add new columns if they don't exist
             await self.migrate_columns()
@@ -131,6 +135,28 @@ class Database:
         except Exception as e:
             logger.error(f"Failed to initialize database: {e}")
             raise
+
+    async def ensure_users_table_structure(self):
+        """Ensure users table has proper structure"""
+        try:
+            # Check if users table exists and has id column
+            await self.execute_command("""
+                CREATE TABLE IF NOT EXISTS users (
+                    id SERIAL PRIMARY KEY,
+                    telegram_id BIGINT UNIQUE NOT NULL,
+                    username VARCHAR(255),
+                    first_name VARCHAR(255),
+                    last_name VARCHAR(255),
+                    is_admin BOOLEAN DEFAULT FALSE NOT NULL,
+                    is_active BOOLEAN DEFAULT TRUE NOT NULL,
+                    last_activity TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            logger.info("Ensured users table structure")
+        except Exception as e:
+            logger.warning(f"Could not ensure users table structure: {e}")
 
     async def migrate_columns(self):
         """Add new columns if they don't exist"""
