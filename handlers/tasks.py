@@ -3399,7 +3399,7 @@ advertisement, spam, annoying
             elif action == "import_keywords":
                 # Handle import functionality
                 # Start import process
-        import_text = """📥 **استيراد المهام**
+                import_text = """📥 **استيراد المهام**
 
 يمكنك استيراد المهام بإحدى الطرق التالية:
 
@@ -3432,9 +3432,8 @@ advertisement, spam, annoying
 
 أرسل الملف أو النص الآن:"""
 
-        await message.answer(import_text, parse_mode="Markdown")
-        await state.set_state("TaskStates:WAITING_IMPORT_DATA")
-                await state.clear()
+                await message.answer(import_text, parse_mode="Markdown")
+                await state.set_state("TaskStates:WAITING_IMPORT_DATA")
             
             elif action == "add_target_words":
                 # Handle adding target words for text cleaner
