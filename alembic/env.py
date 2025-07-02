@@ -3,6 +3,7 @@
 import asyncio
 import os
 from logging.config import fileConfig
+import urllib.parse
 
 from sqlalchemy import pool
 from sqlalchemy.engine import Connection
@@ -100,6 +101,34 @@ async def run_async_migrations() -> None:
     
     # Convert to async URL
     async_database_url = database_url.replace("postgresql://", "postgresql+asyncpg://")
+    
+    # Handle SSL mode properly - remove sslmode parameter if present
+    parsed = urllib.parse.urlparse(async_database_url)
+    if parsed.query:
+        query_params = urllib.parse.parse_qs(parsed.query)
+        # Remove sslmode to prevent it being passed to asyncpg
+        filtered_params = {k: v for k, v in query_params.items() if k != 'sslmode'}
+        
+        if filtered_params:
+            new_query = urllib.parse.urlencode(filtered_params, doseq=True)
+            async_database_url = urllib.parse.urlunparse((
+                parsed.scheme,
+                parsed.netloc,
+                parsed.path,
+                parsed.params,
+                new_query,
+                parsed.fragment
+            ))
+        else:
+            # Remove query entirely if only sslmode was present
+            async_database_url = urllib.parse.urlunparse((
+                parsed.scheme,
+                parsed.netloc,
+                parsed.path,
+                parsed.params,
+                '',
+                parsed.fragment
+            ))
     
     # Create configuration dict
     configuration = {
