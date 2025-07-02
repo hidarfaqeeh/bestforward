@@ -24,6 +24,11 @@ from handlers.sources import SourceHandlers
 from handlers.targets import TargetHandlers
 from localization import localization
 
+# Import performance utilities
+from utils.callback_router import CallbackRouter, get_task_router
+from utils.database_cache import DatabaseCache, get_database_cache
+from utils.memory_manager import MemoryManager, get_memory_manager
+
 
 class BotStates(StatesGroup):
     """FSM States for bot interaction"""
@@ -64,16 +69,51 @@ class BotController:
 
         # User sessions cache
         self.user_sessions: Dict[int, Dict[str, Any]] = {}
+        
+        # Initialize performance utilities
+        self.database_cache = None
+        self.memory_manager = None
+        self.callback_router = None
 
     async def initialize(self):
         """Initialize bot controller and register handlers"""
         try:
             await self.settings_manager.initialize()
+            
+            # Initialize performance utilities
+            await self._initialize_performance_utilities()
+            
             await self._register_handlers()
             await self._setup_bot_commands()
             logger.success("Bot controller initialized successfully")
         except Exception as e:
             logger.error(f"Failed to initialize bot controller: {e}")
+            raise
+            
+    async def _initialize_performance_utilities(self):
+        """Initialize performance utilities for better dashboard performance"""
+        try:
+            # Initialize database cache
+            self.database_cache = get_database_cache(self.database)
+            logger.info("Database cache initialized")
+            
+            # Initialize memory manager
+            self.memory_manager = get_memory_manager()
+            
+            # Register components with memory manager for cleanup
+            self.memory_manager.register_session_manager(self)
+            self.memory_manager.register_cache_manager(self.database_cache)
+            
+            logger.info("Memory manager initialized")
+            
+            # Initialize callback router (will be set up after handlers are initialized)
+            self.callback_router = CallbackRouter()
+            self.memory_manager.register_callback_router(self.callback_router)
+            
+            logger.success("Performance utilities initialized successfully")
+            
+        except Exception as e:
+            logger.error(f"Failed to initialize performance utilities: {e}")
             raise
 
     async def _register_handlers(self):
@@ -628,17 +668,15 @@ Monitoring for forwarding results...
             await message.answer("❌ خطأ في مسح الـ cache")
 
     async def handle_callback(self, callback: CallbackQuery, state: FSMContext):
-        """Handle callback queries"""
+        """Handle callback queries using performance-optimized router"""
         user_id = callback.from_user.id
         data = callback.data
-        logger.info(f"Bot controller received callback: {data}")
-        logger.error(f"DEBUGGING CALLBACK: '{data}' from user {user_id}")
+        logger.debug(f"Bot controller received callback: {data}")
 
         try:
             # Handle manual approval callbacks first - they bypass normal security for admins
-            if data.startswith("approve_") or data.startswith("reject_"):
-                logger.warning(f"=== MANUAL APPROVAL CALLBACK DETECTED: {data} ===")
-                logger.info(f"User ID: {user_id}, Callback data: {data}")
+            if data and (data.startswith("approve_") or data.startswith("reject_")):
+                logger.info(f"Manual approval callback detected: {data}")
                 await self._handle_approval_callback(callback, state)
                 return
                 
@@ -661,82 +699,106 @@ Monitoring for forwarding results...
                 await self.database.create_or_update_user(user_data)
                 logger.info(f"Created user {user_id} during callback handling")
 
-            # Handle session callbacks
-            if data and data.startswith('session_'):
-                if self.session_handler:
-                    await self.session_handler.handle_session_callback(callback, state)
-                    return
-                else:
-                    await callback.answer("❌ معالج الجلسة غير متاح")
+            # Try routing with optimized callback router first
+            if self.callback_router:
+                routed = await self._try_route_callback(callback, state)
+                if routed:
                     return
 
-            # Route callback to appropriate handler
-            if data.startswith("main_"):
-                await self._handle_main_callback(callback, state)
-            elif data.startswith("settings_"):
-                await self._handle_settings_callback(callback, state)
-            elif data == "lang_menu":
-                await self._handle_language_menu(callback, state)
-            elif data.startswith("set_lang_"):
-                await self._handle_language_change(callback, state)
-            elif (data.startswith("task_") or data.startswith("setting_") or data.startswith("content_") or 
-                  data.startswith("preset_") or data.startswith("filter_") or data.startswith("kw_") or 
-                  data.startswith("media_") or data.startswith("text_") or data.startswith("len_") or 
-                  data.startswith("user_") or data.startswith("prefix_") or data.startswith("replace_") or 
-                  data.startswith("hashtag_") or data.startswith("format_") or data.startswith("links_") or
-                  data.startswith("forward_mode_") or data.startswith("mode_") or data.startswith("delay_") or
-                  data.startswith("clear_") or data.startswith("enable_") or data.startswith("disable_") or
-                  data.startswith("reset_") or data.startswith("save_") or data.startswith("view_") or
-                  data.startswith("toggle_") or data.startswith("verified_") or data.startswith("nobots_") or
-                  data.startswith("photo_") or data.startswith("video_") or data.startswith("audio_") or
-                  data.startswith("document_") or data.startswith("voice_") or data.startswith("sticker_") or
-                  data.startswith("animation_") or data.startswith("poll_") or data.startswith("contact_") or
-                  data.startswith("location_") or data.startswith("venue_") or data.startswith("game_") or
-                  data.startswith("basic_") or data.startswith("stealth_") or data.startswith("news_") or
-                  data.startswith("custom_") or data.startswith("apply_") or data.startswith("load_") or
-                  data.startswith("delete_") or data.startswith("copy_") or data.startswith("import_") or
-                  data.startswith("export_") or data.startswith("confirm_") or data.startswith("cancel_") or
-                  data.startswith("set_") or data.startswith("add_") or data.startswith("remove_") or
-                  data.startswith("edit_") or data.startswith("test_") or data.startswith("back_") or
-                  data.startswith("next_") or data.startswith("prev_") or data.startswith("select_") or
-                  data.startswith("instant_") or data.startswith("short_") or data.startswith("medium_") or
-                  data.startswith("long_") or data.startswith("random_") or data.startswith("bold_") or
-                  data.startswith("italic_") or data.startswith("underline_") or data.startswith("strike_") or
-                  data.startswith("spoiler_") or data.startswith("code_") or data.startswith("mono_") or
-                  data.startswith("preserve_") or data.startswith("strip_") or data.startswith("extract_") or
-                  data.startswith("limit_") or data.startswith("min_") or data.startswith("max_") or
-                  data.startswith("keyword_") or data.startswith("length_") or data.startswith("sender_") or
-                  data.startswith("all_") or data.startswith("none_") or data.startswith("default_") or
-                  data.startswith("advanced_") or data.startswith("translation_") or data.startswith("working_") or
-                  data.startswith("recurring_") or data.startswith("lang_") or data.startswith("timezone_") or
-                  data.startswith("interval_") or data.startswith("hour_") or data.startswith("manual_") or data.startswith("auto_") or
-                  data.startswith("header_") or data.startswith("footer_") or data.startswith("inline_button")):
-                # Handle specific task management actions in bot controller
-                if data in ["task_import", "task_export", "task_start_all", "task_stop_all"]:
-                    await self._handle_task_management_actions(callback, state)
-                else:
-                    logger.info(f"Routing to task handlers: {data}")
-                    await self.task_handlers.handle_callback(callback, state)
-            elif data.startswith("source_"):
-                await self.source_handlers.handle_callback(callback, state)
-            elif data.startswith("target_"):
-                await self.target_handlers.handle_callback(callback, state)
-            elif data.startswith("admin_"):
-                await self.admin_handlers.handle_callback(callback, state)
-            elif data.startswith("cleaner_"):
-                # Route text cleaner callbacks to task handlers
-                logger.info(f"Routing text cleaner callback to task handlers: {data}")
-                await self.task_handlers.handle_callback(callback, state)
-            elif data.startswith("popup_info_"):
-                # Handle popup info buttons from inline buttons
-                await self._handle_popup_callback(callback)
-            else:
-                logger.warning(f"Unhandled callback in bot_controller: {data}")
-                await callback.answer("❌ Unknown action.", show_alert=True)
+            # Fallback to manual routing for non-task callbacks
+            await self._handle_fallback_routing(callback, state)
 
         except Exception as e:
             logger.error(f"Error handling callback {data}: {e}")
             await callback.answer("❌ An error occurred.", show_alert=True)
+            
+    async def _try_route_callback(self, callback: CallbackQuery, state: FSMContext) -> bool:
+        """Try to route callback using optimized router"""
+        data = callback.data
+        
+        # Register main route handlers if not already done
+        if not hasattr(self.callback_router, '_main_routes_registered'):
+            await self._register_main_routes()
+            
+        # Try routing
+        return await self.callback_router.route(callback, state)
+        
+    async def _register_main_routes(self):
+        """Register main route handlers with the callback router"""
+        # Session routes
+        self.callback_router.register_prefix("session_", self._handle_session_callback)
+        
+        # Main menu routes
+        self.callback_router.register_prefix("main_", self._handle_main_callback)
+        
+        # Settings routes  
+        self.callback_router.register_prefix("settings_", self._handle_settings_callback)
+        
+        # Language routes
+        self.callback_router.register_exact("lang_menu", self._handle_language_menu)
+        self.callback_router.register_prefix("set_lang_", self._handle_language_change)
+        
+        # Source and target routes
+        self.callback_router.register_prefix("source_", self._route_to_source_handlers)
+        self.callback_router.register_prefix("target_", self._route_to_target_handlers)
+        
+        # Admin routes
+        self.callback_router.register_prefix("admin_", self._route_to_admin_handlers)
+        
+        # Task-related routes (delegate to task router)
+        task_prefixes = [
+            "task_", "setting_", "content_", "filter_", "toggle_", 
+            "advanced_", "cleaner_", "popup_info_"
+        ]
+        for prefix in task_prefixes:
+            self.callback_router.register_prefix(prefix, self._route_to_task_handlers)
+            
+        # Mark as registered
+        self.callback_router._main_routes_registered = True
+        logger.info("Main callback routes registered with router")
+        
+    async def _handle_session_callback(self, callback: CallbackQuery, state: FSMContext):
+        """Handle session callbacks"""
+        if self.session_handler:
+            await self.session_handler.handle_session_callback(callback, state)
+        else:
+            await callback.answer("❌ معالج الجلسة غير متاح")
+            
+    async def _route_to_source_handlers(self, callback: CallbackQuery, state: FSMContext):
+        """Route to source handlers"""
+        await self.source_handlers.handle_callback(callback, state)
+        
+    async def _route_to_target_handlers(self, callback: CallbackQuery, state: FSMContext):
+        """Route to target handlers"""
+        await self.target_handlers.handle_callback(callback, state)
+        
+    async def _route_to_admin_handlers(self, callback: CallbackQuery, state: FSMContext):
+        """Route to admin handlers"""
+        await self.admin_handlers.handle_callback(callback, state)
+        
+    async def _route_to_task_handlers(self, callback: CallbackQuery, state: FSMContext):
+        """Route to task handlers with special handling for some callbacks"""
+        data = callback.data
+        
+        # Handle specific task management actions in bot controller
+        if data in ["task_import", "task_export", "task_start_all", "task_stop_all"]:
+            await self._handle_task_management_actions(callback, state)
+        elif data.startswith("popup_info_"):
+            await self._handle_popup_callback(callback, state)
+        else:
+            logger.debug(f"Routing to task handlers: {data}")
+            await self.task_handlers.handle_callback(callback, state)
+            
+    async def _handle_fallback_routing(self, callback: CallbackQuery, state: FSMContext):
+        """Handle callbacks that couldn't be routed"""
+        data = callback.data
+        
+        # Handle remaining unrouted callbacks
+        if data.startswith("popup_info_"):
+            await self._handle_popup_callback(callback, state)
+        else:
+            logger.warning(f"Unhandled callback in bot_controller: {data}")
+            await callback.answer("❌ Unknown action.", show_alert=True)
 
     async def _handle_main_callback(self, callback: CallbackQuery, state: FSMContext):
         """Handle main menu callbacks"""
