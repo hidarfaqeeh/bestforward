@@ -3400,9 +3400,10 @@ advertisement, spam, annoying
                 # Handle import functionality
                 # Start import process
                 import_text = """📥 **استيراد المهام**
-                
-                يمكنك استيراد المهام بإحدى الطرق التالية:
 
+يمكنك استيراد المهام بإحدى الطرق التالية:
+=======
+               
 1️⃣ **ملف JSON**: أرسل ملف JSON يحتوي على بيانات المهام
 2️⃣ **نص JSON**: الصق نص JSON مباشرة
 3️⃣ **نسخ من بوت آخر**: استورد إعدادات من بوت مماثل
@@ -3432,9 +3433,8 @@ advertisement, spam, annoying
 
 أرسل الملف أو النص الآن:"""
 
-        await message.answer(import_text, parse_mode="Markdown")
-        await state.set_state("TaskStates:WAITING_IMPORT_DATA")
-                await state.clear()
+                await message.answer(import_text, parse_mode="Markdown")
+                await state.set_state("TaskStates:WAITING_IMPORT_DATA")
             
             elif action == "add_target_words":
                 # Handle adding target words for text cleaner
