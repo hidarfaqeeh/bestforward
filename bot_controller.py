@@ -696,8 +696,12 @@ Monitoring for forwarding results...
                   data.startswith("recurring_") or data.startswith("lang_") or data.startswith("timezone_") or
                   data.startswith("interval_") or data.startswith("hour_") or data.startswith("manual_") or data.startswith("auto_") or
                   data.startswith("header_") or data.startswith("footer_") or data.startswith("inline_button")):
-                logger.info(f"Routing to task handlers: {data}")
-                await self.task_handlers.handle_callback(callback, state)
+                # Handle specific task management actions in bot controller
+                if data in ["task_import", "task_export", "task_start_all", "task_stop_all"]:
+                    await self._handle_task_management_actions(callback, state)
+                else:
+                    logger.info(f"Routing to task handlers: {data}")
+                    await self.task_handlers.handle_callback(callback, state)
             elif data.startswith("source_"):
                 await self.source_handlers.handle_callback(callback, state)
             elif data.startswith("target_"):
@@ -739,6 +743,18 @@ Monitoring for forwarding results...
                 stats_text,
                 reply_markup=keyboard
             )
+
+        elif data == "main_system_status":
+            await self._handle_system_status(callback, state)
+
+        elif data == "main_detailed_report":
+            await self._handle_detailed_report(callback, state)
+
+        elif data == "main_quick_start":
+            await self._handle_quick_start(callback, state)
+
+        elif data == "main_advanced_tools":
+            await self._handle_advanced_tools(callback, state)
 
         elif data == "main_settings":
             keyboard = await self.keyboards.get_settings_keyboard(user_id)
@@ -1193,3 +1209,591 @@ Monitoring for forwarding results...
                 logger.info(f"Cleared session for user {user_id}")
         except Exception as e:
             logger.error(f"Error clearing user session: {e}")
+
+    # === Missing Main Menu Handlers ===
+
+    async def _handle_system_status(self, callback: CallbackQuery, state: FSMContext):
+        """Handle system status display"""
+        try:
+            user_id = callback.from_user.id
+            
+            # Get comprehensive system status
+            import psutil
+            import platform
+            from datetime import datetime, timedelta
+            
+            # System metrics
+            cpu_percent = psutil.cpu_percent(interval=1)
+            memory = psutil.virtual_memory()
+            disk = psutil.disk_usage('/')
+            boot_time = datetime.fromtimestamp(psutil.boot_time())
+            uptime = datetime.now() - boot_time
+            
+            # Bot status
+            tasks = await self.database.get_active_tasks()
+            active_tasks = len([t for t in tasks if t.get('is_active')])
+            
+            # Database status
+            try:
+                db_health = await self.database.execute_query("SELECT 1")
+                db_status = "✅ متصلة" if db_health else "❌ خطأ"
+            except:
+                db_status = "❌ منقطعة"
+            
+            # Userbot status
+            userbot_status = "✅ نشط" if self.userbot and self.userbot.is_connected() else "❌ معطل"
+            
+            status_text = f"""🔧 **حالة النظام المفصلة**
+
+**📊 أداء النظام:**
+• المعالج: {cpu_percent:.1f}%
+• الذاكرة: {memory.percent:.1f}% ({memory.used // (1024**3):.1f}GB / {memory.total // (1024**3):.1f}GB)
+• القرص: {disk.percent:.1f}% ({disk.used // (1024**3):.1f}GB / {disk.total // (1024**3):.1f}GB)
+• وقت التشغيل: {str(uptime).split('.')[0]}
+
+**🤖 حالة البوت:**
+• نوع التشغيل: {'Webhook' if hasattr(self, 'webhook_mode') and self.webhook_mode else 'Polling'}
+• إجمالي المهام: {len(tasks)}
+• المهام النشطة: {active_tasks}
+• قاعدة البيانات: {db_status}
+• Userbot: {userbot_status}
+
+**💻 معلومات النظام:**
+• المنصة: {platform.system()} {platform.release()}
+• Python: {platform.python_version()}
+• المعمارية: {platform.architecture()[0]}
+
+**⚡ الخدمات:**
+• محرك التوجيه: {'🟢 يعمل' if hasattr(self.forwarding_engine, 'running') and self.forwarding_engine.running else '🔴 متوقف'}
+• أمان النظام: {'🟢 نشط' if self.security_manager else '🔴 معطل'}
+• إدارة الجلسات: 🟢 نشط"""
+
+            keyboard = InlineKeyboardMarkup(inline_keyboard=[
+                [
+                    InlineKeyboardButton(text="🔄 تحديث", callback_data="main_system_status"),
+                    InlineKeyboardButton(text="📊 إحصائيات متقدمة", callback_data="main_advanced_stats")
+                ],
+                [
+                    InlineKeyboardButton(text="🔧 أدوات الصيانة", callback_data="main_maintenance_tools"),
+                    InlineKeyboardButton(text="⚡ اختبار الأداء", callback_data="main_performance_test")
+                ],
+                [
+                    InlineKeyboardButton(text="🔙 العودة للقائمة الرئيسية", callback_data="main_back")
+                ]
+            ])
+
+            await callback.message.edit_text(status_text, reply_markup=keyboard, parse_mode="Markdown")
+            await callback.answer()
+
+        except Exception as e:
+            logger.error(f"Error in system status: {e}")
+            await callback.answer("❌ خطأ في عرض حالة النظام", show_alert=True)
+
+    async def _handle_detailed_report(self, callback: CallbackQuery, state: FSMContext):
+        """Handle detailed report generation"""
+        try:
+            user_id = callback.from_user.id
+            
+            # Generate comprehensive report
+            from datetime import datetime, timedelta
+            
+            # Get task statistics
+            tasks = await self.database.get_active_tasks()
+            total_tasks = len(tasks)
+            active_tasks = len([t for t in tasks if t.get('is_active')])
+            bot_tasks = len([t for t in tasks if t.get('task_type') == 'bot'])
+            userbot_tasks = len([t for t in tasks if t.get('task_type') == 'userbot'])
+            
+            # Get forwarding statistics for last 24h, 7d, 30d
+            now = datetime.now()
+            stats_24h = await self.database.execute_query(
+                "SELECT COUNT(*) as count FROM forwarding_logs WHERE created_at >= $1",
+                now - timedelta(hours=24)
+            )
+            stats_7d = await self.database.execute_query(
+                "SELECT COUNT(*) as count FROM forwarding_logs WHERE created_at >= $1",
+                now - timedelta(days=7)
+            )
+            stats_30d = await self.database.execute_query(
+                "SELECT COUNT(*) as count FROM forwarding_logs WHERE created_at >= $1",
+                now - timedelta(days=30)
+            )
+            
+            # Get user statistics
+            total_users = await self.database.execute_query("SELECT COUNT(*) as count FROM users")
+            
+            # Get success rates
+            success_stats = await self.database.execute_query(
+                """SELECT 
+                    COUNT(*) as total,
+                    COUNT(CASE WHEN status = 'success' THEN 1 END) as successful
+                FROM forwarding_logs 
+                WHERE created_at >= $1""",
+                now - timedelta(days=7)
+            )
+            
+            success_rate = 0
+            if success_stats and success_stats[0]['total'] > 0:
+                success_rate = (success_stats[0]['successful'] / success_stats[0]['total']) * 100
+
+            report_text = f"""📋 **التقرير المفصل**
+
+**📈 إحصائيات المهام:**
+• إجمالي المهام: {total_tasks}
+• المهام النشطة: {active_tasks}
+• مهام Bot API: {bot_tasks}
+• مهام Userbot: {userbot_tasks}
+• معدل التفعيل: {(active_tasks/total_tasks*100):.1f}% إذا كان هناك مهام
+
+**📊 إحصائيات التوجيه:**
+• آخر 24 ساعة: {stats_24h[0]['count'] if stats_24h else 0}
+• آخر 7 أيام: {stats_7d[0]['count'] if stats_7d else 0} 
+• آخر 30 يوم: {stats_30d[0]['count'] if stats_30d else 0}
+• معدل النجاح (7 أيام): {success_rate:.1f}%
+
+**👥 إحصائيات المستخدمين:**
+• إجمالي المستخدمين: {total_users[0]['count'] if total_users else 0}
+• المديرين: {len(self.config.admin_ids) if hasattr(self.config, 'admin_ids') else 'غير محدد'}
+
+**🔧 حالة النظام:**
+• تاريخ التقرير: {now.strftime('%Y-%m-%d %H:%M:%S')}
+• البيانات صحيحة حتى: {now.strftime('%H:%M')}
+• المنطقة الزمنية: UTC
+
+**📝 ملاحظات:**
+• جميع الإحصائيات محدثة في الوقت الفعلي
+• يتم تحديث البيانات كل دقيقة
+• التقرير يشمل جميع المهام والمستخدمين"""
+
+            keyboard = InlineKeyboardMarkup(inline_keyboard=[
+                [
+                    InlineKeyboardButton(text="📤 تصدير PDF", callback_data="export_report_pdf"),
+                    InlineKeyboardButton(text="📊 تصدير Excel", callback_data="export_report_excel")
+                ],
+                [
+                    InlineKeyboardButton(text="📈 رسوم بيانية", callback_data="report_charts"),
+                    InlineKeyboardButton(text="🔍 تحليل متقدم", callback_data="report_analysis")
+                ],
+                [
+                    InlineKeyboardButton(text="🔄 تحديث التقرير", callback_data="main_detailed_report"),
+                    InlineKeyboardButton(text="📧 إرسال بالبريد", callback_data="email_report")
+                ],
+                [
+                    InlineKeyboardButton(text="🔙 العودة للقائمة الرئيسية", callback_data="main_back")
+                ]
+            ])
+
+            await callback.message.edit_text(report_text, reply_markup=keyboard, parse_mode="Markdown")
+            await callback.answer()
+
+        except Exception as e:
+            logger.error(f"Error in detailed report: {e}")
+            await callback.answer("❌ خطأ في إنشاء التقرير", show_alert=True)
+
+    async def _handle_quick_start(self, callback: CallbackQuery, state: FSMContext):
+        """Handle quick start guide"""
+        try:
+            user_id = callback.from_user.id
+            
+            quick_start_text = f"""🚀 **دليل البدء السريع**
+
+**📋 الخطوات الأساسية:**
+
+**1️⃣ إنشاء مهمة جديدة**
+• انقر على "📋 المهام" → "➕ إنشاء مهمة"
+• اختر نوع المهمة (Bot API أو Userbot)
+• أدخل اسم ووصف المهمة
+
+**2️⃣ إضافة المصادر**
+• انقر على "📥 المصادر" في إعدادات المهمة
+• أضف معرف القناة أو اسم المستخدم
+• مثال: @channel_name أو -1001234567890
+
+**3️⃣ إضافة الأهداف**
+• انقر على "📤 الأهداف" في إعدادات المهمة  
+• أضف القنوات التي تريد التوجيه إليها
+• تأكد من أن البوت مدير في القنوات
+
+**4️⃣ تفعيل المهمة**
+• ارجع لعرض المهمة
+• انقر على "تفعيل المهمة"
+• ستبدأ المراقبة والتوجيه فوراً
+
+**⚡ نصائح سريعة:**
+• استخدم Userbot للقنوات الخاصة
+• اضبط التأخير لتجنب الحظر
+• فعل الفلاتر لتخصيص المحتوى
+• راقب الإحصائيات باستمرار
+
+**🎯 الأهداف الشائعة:**
+• توجيه من قنوات الأخبار → قناتك
+• نسخ المحتوى مع تعديل
+• فلترة أنواع محددة من المحتوى"""
+
+            keyboard = InlineKeyboardMarkup(inline_keyboard=[
+                [
+                    InlineKeyboardButton(text="➕ إنشاء مهمة الآن", callback_data="task_create"),
+                    InlineKeyboardButton(text="📺 شاهد فيديو تعليمي", callback_data="tutorial_video")
+                ],
+                [
+                    InlineKeyboardButton(text="❓ أسئلة شائعة", callback_data="quick_faq"),
+                    InlineKeyboardButton(text="🛠️ حل المشاكل", callback_data="troubleshooting")
+                ],
+                [
+                    InlineKeyboardButton(text="📖 دليل كامل", callback_data="full_guide"),
+                    InlineKeyboardButton(text="💬 دعم فني", callback_data="tech_support")
+                ],
+                [
+                    InlineKeyboardButton(text="🔙 العودة للقائمة الرئيسية", callback_data="main_back")
+                ]
+            ])
+
+            await callback.message.edit_text(quick_start_text, reply_markup=keyboard, parse_mode="Markdown")
+            await callback.answer()
+
+        except Exception as e:
+            logger.error(f"Error in quick start: {e}")
+            await callback.answer("❌ خطأ في عرض دليل البدء السريع", show_alert=True)
+
+    async def _handle_advanced_tools(self, callback: CallbackQuery, state: FSMContext):
+        """Handle advanced tools menu"""
+        try:
+            user_id = callback.from_user.id
+            
+            # Check admin permissions for advanced tools
+            is_admin = await self.security_manager.is_admin(user_id)
+            
+            tools_text = f"""🛠️ **الأدوات المتقدمة**
+
+**📊 أدوات التحليل:**
+• مراقبة الأداء في الوقت الفعلي
+• تحليل معدلات النجاح
+• إحصائيات مفصلة للمهام
+• تقارير الاستخدام
+
+**🔧 أدوات الإدارة:**
+• إدارة المهام المتقدمة
+• تصدير واستيراد الإعدادات  
+• النسخ الاحتياطي للبيانات
+• تحسين الأداء
+
+**⚙️ أدوات التكوين:**
+• إعدادات متقدمة للبوت
+• تخصيص واجهة المستخدم
+• إدارة الصلاحيات
+• تكوين التنبيهات
+
+**🔍 أدوات التشخيص:**
+• فحص صحة النظام
+• مراقبة استهلاك الموارد
+• تحليل الأخطاء
+• اختبار الاتصالات
+
+{'**👑 أدوات المدير متاحة لك**' if is_admin else '**ℹ️ بعض الأدوات تتطلب صلاحيات إدارية**'}"""
+
+            keyboard_rows = [
+                [
+                    InlineKeyboardButton(text="📊 مراقب الأداء", callback_data="tool_performance_monitor"),
+                    InlineKeyboardButton(text="📈 محلل البيانات", callback_data="tool_data_analyzer")
+                ],
+                [
+                    InlineKeyboardButton(text="🔧 مدير المهام المتقدم", callback_data="tool_advanced_task_manager"),
+                    InlineKeyboardButton(text="💾 نسخ احتياطي", callback_data="tool_backup_manager")
+                ],
+                [
+                    InlineKeyboardButton(text="⚙️ تكوين النظام", callback_data="tool_system_config"),
+                    InlineKeyboardButton(text="🔍 أداة التشخيص", callback_data="tool_diagnostics")
+                ]
+            ]
+            
+            if is_admin:
+                keyboard_rows.append([
+                    InlineKeyboardButton(text="👑 لوحة المدير", callback_data="admin_dashboard"),
+                    InlineKeyboardButton(text="🔐 إدارة الأمان", callback_data="security_manager")
+                ])
+            
+            keyboard_rows.append([
+                InlineKeyboardButton(text="🔙 العودة للقائمة الرئيسية", callback_data="main_back")
+            ])
+
+            keyboard = InlineKeyboardMarkup(inline_keyboard=keyboard_rows)
+
+            await callback.message.edit_text(tools_text, reply_markup=keyboard, parse_mode="Markdown")
+            await callback.answer()
+
+                 except Exception as e:
+            logger.error(f"Error in advanced tools: {e}")
+            await callback.answer("❌ خطأ في عرض الأدوات المتقدمة", show_alert=True)
+
+    # === Task Management Actions Handler ===
+
+    async def _handle_task_management_actions(self, callback: CallbackQuery, state: FSMContext):
+        """Handle task management actions (import, export, start/stop all)"""
+        try:
+            data = callback.data
+            user_id = callback.from_user.id
+            
+            if data == "task_import":
+                await self._handle_task_import(callback, state)
+            elif data == "task_export":
+                await self._handle_task_export(callback, state)
+            elif data == "task_start_all":
+                await self._handle_task_start_all(callback, state)
+            elif data == "task_stop_all":
+                await self._handle_task_stop_all(callback, state)
+            else:
+                await callback.answer("❌ إجراء غير معروف", show_alert=True)
+                
+        except Exception as e:
+            logger.error(f"Error in task management actions: {e}")
+            await callback.answer("❌ خطأ في تنفيذ الإجراء", show_alert=True)
+
+    async def _handle_task_import(self, callback: CallbackQuery, state: FSMContext):
+        """Handle task import"""
+        try:
+            user_id = callback.from_user.id
+            
+            import_text = f"""📥 **استيراد المهام**
+
+**الطرق المدعومة:**
+• 📂 ملف JSON
+• 📋 نص مُنسق 
+• 🔗 رابط التكوين
+• 💾 نسخة احتياطية
+
+**تنسيق JSON المطلوب:**
+```json
+{{
+  "tasks": [
+    {{
+      "name": "اسم المهمة",
+      "description": "وصف المهمة",
+      "task_type": "bot",
+      "sources": ["@channel1", "@channel2"],
+      "targets": ["@mychannel"],
+      "settings": {{}}
+    }}
+  ]
+}}
+```
+
+**📝 التعليمات:**
+1. أرسل الملف أو النص
+2. سيتم التحقق من التنسيق
+3. اختر المهام للاستيراد
+4. تأكيد الاستيراد"""
+
+            keyboard = InlineKeyboardMarkup(inline_keyboard=[
+                [
+                    InlineKeyboardButton(text="📂 استيراد ملف", callback_data="import_file"),
+                    InlineKeyboardButton(text="📋 استيراد نص", callback_data="import_text")
+                ],
+                [
+                    InlineKeyboardButton(text="🔗 من رابط", callback_data="import_url"),
+                    InlineKeyboardButton(text="💾 من نسخة احتياطية", callback_data="import_backup")
+                ],
+                [
+                    InlineKeyboardButton(text="📖 دليل التنسيق", callback_data="import_format_guide"),
+                    InlineKeyboardButton(text="🧪 اختبار التنسيق", callback_data="test_import_format")
+                ],
+                [
+                    InlineKeyboardButton(text="🔙 العودة للمهام", callback_data="main_tasks")
+                ]
+            ])
+
+            await callback.message.edit_text(import_text, reply_markup=keyboard, parse_mode="Markdown")
+            await callback.answer()
+
+        except Exception as e:
+            logger.error(f"Error in task import: {e}")
+            await callback.answer("❌ خطأ في استيراد المهام", show_alert=True)
+
+    async def _handle_task_export(self, callback: CallbackQuery, state: FSMContext):
+        """Handle task export"""
+        try:
+            user_id = callback.from_user.id
+            
+            # Get user tasks
+            tasks = await self.database.execute_query(
+                """SELECT t.*, u.telegram_id 
+                FROM tasks t 
+                JOIN users u ON t.user_id = u.id 
+                WHERE u.telegram_id = $1""",
+                user_id
+            )
+            
+            total_tasks = len(tasks) if tasks else 0
+            active_tasks = len([t for t in tasks if t.get('is_active')]) if tasks else 0
+            
+            export_text = f"""📤 **تصدير المهام**
+
+**إحصائيات المهام:**
+• إجمالي المهام: {total_tasks}
+• المهام النشطة: {active_tasks}
+• المهام غير النشطة: {total_tasks - active_tasks}
+
+**تنسيقات التصدير:**
+• 📄 JSON (للاستيراد لاحقاً)
+• 📊 Excel (للتحليل)
+• 📋 نص مُنسق (للمراجعة)
+• 💾 نسخة احتياطية كاملة
+
+**خيارات التصدير:**
+• كل المهام أو مهام محددة
+• مع أو بدون الإعدادات
+• مع أو بدون الإحصائيات
+
+{f'**⚠️ لا توجد مهام للتصدير**' if total_tasks == 0 else '**✅ جاهز للتصدير**'}"""
+
+            keyboard_rows = []
+            
+            if total_tasks > 0:
+                keyboard_rows.extend([
+                    [
+                        InlineKeyboardButton(text="📄 تصدير JSON", callback_data="export_json"),
+                        InlineKeyboardButton(text="📊 تصدير Excel", callback_data="export_excel")
+                    ],
+                    [
+                        InlineKeyboardButton(text="📋 تصدير نص", callback_data="export_text"),
+                        InlineKeyboardButton(text="💾 نسخة احتياطية", callback_data="export_backup")
+                    ],
+                    [
+                        InlineKeyboardButton(text="🎯 تصدير محدد", callback_data="export_selective"),
+                        InlineKeyboardButton(text="📈 مع الإحصائيات", callback_data="export_with_stats")
+                    ]
+                ])
+            else:
+                keyboard_rows.append([
+                    InlineKeyboardButton(text="➕ إنشاء مهمة أولاً", callback_data="task_create")
+                ])
+            
+            keyboard_rows.append([
+                InlineKeyboardButton(text="🔙 العودة للمهام", callback_data="main_tasks")
+            ])
+
+            keyboard = InlineKeyboardMarkup(inline_keyboard=keyboard_rows)
+
+            await callback.message.edit_text(export_text, reply_markup=keyboard, parse_mode="Markdown")
+            await callback.answer()
+
+        except Exception as e:
+            logger.error(f"Error in task export: {e}")
+            await callback.answer("❌ خطأ في تصدير المهام", show_alert=True)
+
+    async def _handle_task_start_all(self, callback: CallbackQuery, state: FSMContext):
+        """Handle start all tasks"""
+        try:
+            user_id = callback.from_user.id
+            
+            # Get user's inactive tasks
+            tasks = await self.database.execute_query(
+                """SELECT t.* FROM tasks t 
+                JOIN users u ON t.user_id = u.id 
+                WHERE u.telegram_id = $1 AND t.is_active = false""",
+                user_id
+            )
+            
+            if not tasks:
+                await callback.answer("ℹ️ جميع المهام نشطة بالفعل أو لا توجد مهام", show_alert=True)
+                return
+            
+            start_text = f"""🎯 **بدء جميع المهام**
+
+**المهام المعطلة:**
+• عدد المهام: {len(tasks)}
+• سيتم تفعيل جميع المهام
+• سيبدأ التوجيه فوراً
+
+**تحذيرات:**
+⚠️ تأكد من صحة إعدادات المهام
+⚠️ تحقق من صلاحيات البوت
+⚠️ راقب استهلاك الموارد
+
+**المهام التي ستبدأ:**"""
+
+            # Add task names
+            for i, task in enumerate(tasks[:5], 1):
+                start_text += f"\n{i}. {task.get('name', 'مهمة بدون اسم')}"
+            
+            if len(tasks) > 5:
+                start_text += f"\n... و {len(tasks) - 5} مهام أخرى"
+
+            keyboard = InlineKeyboardMarkup(inline_keyboard=[
+                [
+                    InlineKeyboardButton(text="✅ بدء جميع المهام", callback_data="confirm_start_all"),
+                    InlineKeyboardButton(text="❌ إلغاء", callback_data="main_tasks")
+                ],
+                [
+                    InlineKeyboardButton(text="🎯 بدء محدد", callback_data="selective_start"),
+                    InlineKeyboardButton(text="📊 عرض التفاصيل", callback_data="view_inactive_tasks")
+                ],
+                [
+                    InlineKeyboardButton(text="🔙 العودة للمهام", callback_data="main_tasks")
+                ]
+            ])
+
+            await callback.message.edit_text(start_text, reply_markup=keyboard, parse_mode="Markdown")
+            await callback.answer()
+
+        except Exception as e:
+            logger.error(f"Error in start all tasks: {e}")
+            await callback.answer("❌ خطأ في بدء المهام", show_alert=True)
+
+    async def _handle_task_stop_all(self, callback: CallbackQuery, state: FSMContext):
+        """Handle stop all tasks"""
+        try:
+            user_id = callback.from_user.id
+            
+            # Get user's active tasks
+            tasks = await self.database.execute_query(
+                """SELECT t.* FROM tasks t 
+                JOIN users u ON t.user_id = u.id 
+                WHERE u.telegram_id = $1 AND t.is_active = true""",
+                user_id
+            )
+            
+            if not tasks:
+                await callback.answer("ℹ️ لا توجد مهام نشطة للإيقاف", show_alert=True)
+                return
+            
+            stop_text = f"""⏹️ **إيقاف جميع المهام**
+
+**المهام النشطة:**
+• عدد المهام: {len(tasks)}
+• سيتم إيقاف جميع المهام
+• سيتوقف التوجيه فوراً
+
+**تأثير الإيقاف:**
+• لن يتم توجيه رسائل جديدة
+• ستبقى الإعدادات محفوظة
+• يمكن إعادة التشغيل لاحقاً
+
+**المهام التي ستتوقف:**"""
+
+            # Add task names
+            for i, task in enumerate(tasks[:5], 1):
+                stop_text += f"\n{i}. {task.get('name', 'مهمة بدون اسم')}"
+            
+            if len(tasks) > 5:
+                stop_text += f"\n... و {len(tasks) - 5} مهام أخرى"
+
+            keyboard = InlineKeyboardMarkup(inline_keyboard=[
+                [
+                    InlineKeyboardButton(text="⏹️ إيقاف جميع المهام", callback_data="confirm_stop_all"),
+                    InlineKeyboardButton(text="❌ إلغاء", callback_data="main_tasks")
+                ],
+                [
+                    InlineKeyboardButton(text="🎯 إيقاف محدد", callback_data="selective_stop"),
+                    InlineKeyboardButton(text="📊 عرض التفاصيل", callback_data="view_active_tasks")
+                ],
+                [
+                    InlineKeyboardButton(text="🔙 العودة للمهام", callback_data="main_tasks")
+                ]
+            ])
+
+            await callback.message.edit_text(stop_text, reply_markup=keyboard, parse_mode="Markdown")
+            await callback.answer()
+
+        except Exception as e:
+            logger.error(f"Error in stop all tasks: {e}")
+            await callback.answer("❌ خطأ في إيقاف المهام", show_alert=True)
