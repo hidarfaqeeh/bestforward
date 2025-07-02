@@ -61,9 +61,47 @@ class Database:
                     "pool_recycle": 3600,
                 }
                 
-                # Add SSL configuration if required
-                if 'sslmode=require' in self.original_url:
-                    engine_args["connect_args"] = {"ssl": "require"}
+                # Handle SSL configuration properly for asyncpg
+                import urllib.parse
+                parsed = urllib.parse.urlparse(self.original_url)
+                query_params = urllib.parse.parse_qs(parsed.query)
+                
+                if 'sslmode' in query_params:
+                    ssl_mode = query_params['sslmode'][0]
+                    # Remove sslmode from the async URL to prevent it being passed to asyncpg
+                    filtered_params = {k: v for k, v in query_params.items() if k != 'sslmode'}
+                    
+                    # Rebuild the async URL without sslmode
+                    if filtered_params:
+                        new_query = urllib.parse.urlencode(filtered_params, doseq=True)
+                        parsed_async = urllib.parse.urlparse(self.async_database_url)
+                        self.async_database_url = urllib.parse.urlunparse((
+                            parsed_async.scheme,
+                            parsed_async.netloc,
+                            parsed_async.path,
+                            parsed_async.params,
+                            new_query,
+                            parsed_async.fragment
+                        ))
+                    else:
+                        # Remove query entirely if only sslmode was present
+                        parsed_async = urllib.parse.urlparse(self.async_database_url)
+                        self.async_database_url = urllib.parse.urlunparse((
+                            parsed_async.scheme,
+                            parsed_async.netloc,
+                            parsed_async.path,
+                            parsed_async.params,
+                            '',
+                            parsed_async.fragment
+                        ))
+                    
+                    # Configure SSL for SQLAlchemy engine
+                    if ssl_mode == 'require':
+                        engine_args["connect_args"] = {"ssl": "require"}
+                    elif ssl_mode == 'prefer':
+                        engine_args["connect_args"] = {"ssl": "prefer"}
+                    elif ssl_mode == 'disable':
+                        engine_args["connect_args"] = {"ssl": "disable"}
                 
                 self.engine = create_async_engine(
                     self.async_database_url,
@@ -89,9 +127,12 @@ class Database:
                 import urllib.parse
                 parsed_url = urllib.parse.urlparse(self.original_url)
 
-                # Extract SSL mode from query parameters
+                # Extract SSL mode from query parameters and remove it from parsed URL
                 query_params = urllib.parse.parse_qs(parsed_url.query)
                 ssl_mode = query_params.get('sslmode', ['prefer'])[0]
+                
+                # Remove sslmode from query params to avoid passing it to asyncpg
+                filtered_params = {k: v for k, v in query_params.items() if k != 'sslmode'}
                 
                 # Configure SSL context for production environments
                 ssl_context = None
@@ -100,19 +141,44 @@ class Database:
                     ssl_context = ssl.create_default_context()
                     ssl_context.check_hostname = False
                     ssl_context.verify_mode = ssl.CERT_NONE
+                elif ssl_mode == 'prefer':
+                    ssl_context = True  # Let asyncpg handle SSL automatically
+                elif ssl_mode == 'disable':
+                    ssl_context = False  # Disable SSL
+                else:
+                    ssl_context = None  # Use asyncpg default
 
                 # Create connection pool with proper SSL configuration
-                self.pool = await asyncpg.create_pool(
-                    host=parsed_url.hostname,
-                    port=parsed_url.port or 5432,
-                    user=parsed_url.username,
-                    password=parsed_url.password,
-                    database=parsed_url.path.lstrip('/'),
-                    ssl=ssl_context,
-                    min_size=5,
-                    max_size=20,
-                    command_timeout=60
-                )
+                try:
+                    self.pool = await asyncpg.create_pool(
+                        host=parsed_url.hostname,
+                        port=parsed_url.port or 5432,
+                        user=parsed_url.username,
+                        password=parsed_url.password,
+                        database=parsed_url.path.lstrip('/'),
+                        ssl=ssl_context,
+                        min_size=5,
+                        max_size=20,
+                        command_timeout=60
+                    )
+                except Exception as pool_error:
+                    logger.warning(f"Failed to create connection pool with SSL context: {pool_error}")
+                    # Try without SSL context as fallback
+                    try:
+                        self.pool = await asyncpg.create_pool(
+                            host=parsed_url.hostname,
+                            port=parsed_url.port or 5432,
+                            user=parsed_url.username,
+                            password=parsed_url.password,
+                            database=parsed_url.path.lstrip('/'),
+                            min_size=5,
+                            max_size=20,
+                            command_timeout=60
+                        )
+                        logger.info("Connection pool created without SSL context")
+                    except Exception as fallback_error:
+                        logger.error(f"Failed to create connection pool even without SSL: {fallback_error}")
+                        raise
             else:
                 # For SQLite, we'll use the SQLAlchemy session directly
                 self.pool = None
@@ -158,6 +224,9 @@ class Database:
             elif "SSL" in error_msg or "certificate" in error_msg:
                 logger.error(f"SSL/TLS connection error: {error_msg}")
                 logger.error("Try adjusting SSL settings in DATABASE_URL")
+            elif "sslmode" in error_msg.lower():
+                logger.error(f"SSL mode parameter error: {error_msg}")
+                logger.error("The sslmode parameter should be handled by the connection logic, not passed directly to asyncpg")
             else:
                 logger.error(f"Failed to initialize database: {e}")
             raise
